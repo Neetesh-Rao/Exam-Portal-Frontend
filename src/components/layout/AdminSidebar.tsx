@@ -1,6 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useLogoutMutation } from "@/redux/api/authApi";
 
 const navItems = [
   {
@@ -88,6 +89,16 @@ const navItems = [
 
 export default function AdminSidebar() {
   const pathname = usePathname();
+  const [logout] = useLogoutMutation();
+
+  const handleLogout = async () => {
+    try {
+      await logout({}).unwrap();
+    } catch {
+      // ignore
+    }
+    window.location.href = "/login";
+  };
 
   return (
     <aside className="w-64 h-screen bg-white dark:bg-dark-bg border-r border-[var(--border-color)] flex flex-col fixed left-0 top-0 z-40">
@@ -123,10 +134,7 @@ export default function AdminSidebar() {
       <div className="p-4 border-t border-[var(--border-color)]">
         <button
           type="button"
-          onClick={async () => {
-            await fetch("/api/auth/logout", { method: "POST" });
-            window.location.href = "/login";
-          }}
+          onClick={handleLogout}
           className="flex items-center gap-2 w-full px-3 py-2 text-sm text-[var(--text-muted)] hover:text-danger rounded-lg hover:bg-danger-subtle dark:hover:bg-danger/10 transition-colors cursor-pointer"
         >
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">

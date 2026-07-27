@@ -11,6 +11,7 @@
   "dependencies": {
     "@hookform/resolvers": "^5.5.7",
     "@monaco-editor/react": "^4.7.0",
+    "@reduxjs/toolkit": "^2.12.0",
     "@types/bcryptjs": "^2.4.6",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/uuid": "^10.0.0",
@@ -25,6 +26,7 @@
     "react": "19.2.6",
     "react-dom": "19.2.6",
     "react-hook-form": "^7.83.0",
+    "react-redux": "^9.3.0",
     "recharts": "^3.10.1",
     "socket.io-client": "^4.8.3",
     "uuid": "^14.0.1",

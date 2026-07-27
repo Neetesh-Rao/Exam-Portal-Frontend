@@ -6,42 +6,28 @@ import { motion } from "framer-motion";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import Card from "@/components/ui/Card";
+import { useLoginMutation } from "@/redux/api/authApi";
 
 export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [login, { isLoading }] = useLoginMutation();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
-    setLoading(true);
 
     try {
-      const res = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
-      });
-
-      const data = await res.json();
-      setLoading(false);
-
-      if (data.error) {
-        setError(data.error);
-        return;
-      }
-
-      if (data.user.role === "candidate") {
+      const data: any = await login({ email, password }).unwrap();
+      if (data?.user?.role === "candidate") {
         router.push("/candidate/dashboard");
       } else {
         router.push("/admin/dashboard");
       }
-    } catch (err) {
-      setLoading(false);
-      setError("An unexpected error occurred. Please try again.");
+    } catch (err: any) {
+      setError(err?.data?.error || "Invalid email or password");
     }
   };
 
@@ -53,7 +39,6 @@ export default function LoginPage() {
         transition={{ duration: 0.25, ease: "easeOut" }}
         className="w-full max-w-md"
       >
-        {/* Logo */}
         <div className="text-center mb-8">
           <div className="w-12 h-12 bg-[var(--text-primary)] rounded-xl flex items-center justify-center mx-auto mb-4 shadow-sm">
             <span className="text-[var(--bg-color)] font-bold text-xl">H</span>
@@ -100,7 +85,7 @@ export default function LoginPage() {
               <a href="#" className="text-sm text-[var(--color-accent)] hover:text-[var(--color-accent-hover)] font-medium transition-colors">Forgot password?</a>
             </div>
 
-            <Button type="submit" loading={loading} className="w-full">
+            <Button type="submit" loading={isLoading} className="w-full">
               Sign In
             </Button>
           </form>

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
+import { ReduxProvider } from "@/redux/providers";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -16,7 +17,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
       </head>
       <body className="min-h-screen bg-app-bg text-[var(--text-primary)] dark:bg-dark-bg dark:text-dark-text antialiased">
-        {children}
+        <ReduxProvider>
+          {children}
+        </ReduxProvider>
       </body>
     </html>
   );

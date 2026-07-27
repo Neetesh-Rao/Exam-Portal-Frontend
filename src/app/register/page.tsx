@@ -6,6 +6,7 @@ import { motion } from "framer-motion";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import Card from "@/components/ui/Card";
+import { useRegisterMutation } from "@/redux/api/authApi";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -14,32 +15,17 @@ export default function RegisterPage() {
   const [password, setPassword] = useState("");
   const [companyName, setCompanyName] = useState("");
   const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [registerUser, { isLoading }] = useRegisterMutation();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
-    setLoading(true);
 
     try {
-      const res = await fetch("/api/auth/register", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, email, password, companyName }),
-      });
-
-      const data = await res.json();
-      setLoading(false);
-
-      if (data.error) {
-        setError(data.error);
-        return;
-      }
-
+      await registerUser({ name, email, password, companyName }).unwrap();
       router.push("/admin/dashboard");
-    } catch (err) {
-      setLoading(false);
-      setError("An unexpected error occurred. Please try again.");
+    } catch (err: any) {
+      setError(err?.data?.error || "Registration failed. Please try again.");
     }
   };
 
@@ -51,7 +37,6 @@ export default function RegisterPage() {
         transition={{ duration: 0.25, ease: "easeOut" }}
         className="w-full max-w-md"
       >
-        {/* Logo */}
         <div className="text-center mb-8">
           <div className="w-12 h-12 bg-[var(--text-primary)] rounded-xl flex items-center justify-center mx-auto mb-4 shadow-sm">
             <span className="text-[var(--bg-color)] font-bold text-xl">H</span>
@@ -107,7 +92,7 @@ export default function RegisterPage() {
               required
             />
 
-            <Button type="submit" loading={loading} className="w-full">
+            <Button type="submit" loading={isLoading} className="w-full">
               Create Account
             </Button>
           </form>
