@@ -1,7 +1,6 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import { motion } from "framer-motion";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
@@ -21,6 +20,10 @@ export default function LoginPage() {
 
     try {
       const data: any = await login({ email, password }).unwrap();
+      const token = data?.token || data?.accessToken;
+      if (token && typeof window !== "undefined") {
+        localStorage.setItem("token", token);
+      }
       if (data?.user?.role === "candidate") {
         router.push("/candidate/dashboard");
       } else {
@@ -40,11 +43,13 @@ export default function LoginPage() {
         className="w-full max-w-md"
       >
         <div className="text-center mb-8">
-          <div className="w-12 h-12 bg-[var(--text-primary)] rounded-xl flex items-center justify-center mx-auto mb-4 shadow-sm">
-            <span className="text-[var(--bg-color)] font-bold text-xl">H</span>
-          </div>
-          <h1 className="text-2xl font-bold text-[var(--text-primary)] tracking-tight">Welcome back</h1>
-          <p className="text-sm text-[var(--text-muted)] mt-1">Sign in to your account</p>
+          <img
+            src="/bitmax-logo.png"
+            alt="BITMAX Technology (P) Ltd"
+            className="h-14 w-auto mx-auto mb-4 object-contain"
+          />
+          <h1 className="text-2xl font-bold text-[var(--text-primary)] tracking-tight">Admin Assessment Portal</h1>
+          <p className="text-sm text-[var(--text-muted)] mt-1">BITMAX Technology (P) Ltd — STEP AHEAD</p>
         </div>
 
         <Card>
@@ -60,11 +65,11 @@ export default function LoginPage() {
             )}
 
             <Input
-              label="Email"
+              label="Admin Email"
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@company.com"
+              placeholder="admin@bitmaxtech.com"
               required
             />
 
@@ -82,26 +87,16 @@ export default function LoginPage() {
                 <input type="checkbox" className="w-4 h-4 rounded border-[var(--border-color)] text-[var(--color-accent)] focus:ring-[var(--color-accent)]" />
                 <span className="text-sm text-[var(--text-secondary)] group-hover:text-[var(--text-primary)] transition-colors">Remember me</span>
               </label>
-              <a href="#" className="text-sm text-[var(--color-accent)] hover:text-[var(--color-accent-hover)] font-medium transition-colors">Forgot password?</a>
             </div>
 
             <Button type="submit" loading={isLoading} className="w-full">
-              Sign In
+              Sign In to Bitmax Portal
             </Button>
           </form>
-
-          <div className="mt-6 pt-6 border-t border-[var(--border-color)] text-center">
-            <p className="text-sm text-[var(--text-muted)]">
-              Don&apos;t have an account?{" "}
-              <Link href="/register" className="text-[var(--color-accent)] hover:text-[var(--color-accent-hover)] font-medium transition-colors">
-                Sign up
-              </Link>
-            </p>
-          </div>
         </Card>
 
         <p className="text-center text-xs text-[var(--text-muted)] mt-6">
-          By signing in, you agree to our Terms of Service and Privacy Policy
+          © 2026 BITMAX Technology (P) Ltd. All rights reserved.
         </p>
       </motion.div>
     </div>

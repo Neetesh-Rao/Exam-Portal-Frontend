@@ -34,7 +34,7 @@ export default function ExamPage({ params }: { params: Promise<{ token: string }
   const [questions, setQuestions] = useState<Question[]>([]);
   const [answers, setAnswers] = useState<Answer[]>([]);
   const [currentIdx, setCurrentIdx] = useState(0);
-  const [timeLeft, setTimeLeft] = useState(3600);
+  const [timeLeft, setTimeLeft] = useState<number | null>(null);
   const [totalTime, setTotalTime] = useState(3600);
   const [violations, setViolations] = useState(0);
   const [maxViolations, setMaxViolations] = useState(3);
@@ -43,6 +43,8 @@ export default function ExamPage({ params }: { params: Promise<{ token: string }
   const [showConfirmSubmit, setShowConfirmSubmit] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [testEnded, setTestEnded] = useState(false);
+  const [isGracePeriod, setIsGracePeriod] = useState(true);
+
   const [proctoringConfig, setProctoringConfig] = useState<{ disableCopyPaste: boolean; disableRightClick: boolean; fullScreenRequired: boolean }>({
     disableCopyPaste: true,
     disableRightClick: true,
@@ -56,7 +58,12 @@ export default function ExamPage({ params }: { params: Promise<{ token: string }
   const screenBlobsRef = useRef<Blob[]>([]);
   const webcamRecorderRef = useRef<MediaRecorder | null>(null);
   const screenRecorderRef = useRef<MediaRecorder | null>(null);
-  const [cameraActive, setCameraActive] = useState(false);
+
+  // 10 second grace period on exam load
+  useEffect(() => {
+    const timer = setTimeout(() => setIsGracePeriod(false), 10000);
+    return () => clearTimeout(timer);
+  }, []);
 
   // Load test data
   useEffect(() => {
@@ -64,30 +71,43 @@ export default function ExamPage({ params }: { params: Promise<{ token: string }
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ token }),
-    }).then((r) => r.json()).then((d) => {
-      if (d.submission?.id) setSubIdState(d.submission.id);
-      if (d.questions) setQuestions(d.questions);
-      if (d.submission?.answers) setAnswers(d.submission.answers);
-      if (d.test?.totalDurationSeconds) {
-        setTotalTime(d.test.totalDurationSeconds);
-        // Calculate remaining time based on start
-        const started = new Date(d.submission?.startedAt || Date.now()).getTime();
-        const elapsed = Math.floor((Date.now() - started) / 1000);
-        setTimeLeft(Math.max(0, d.test.totalDurationSeconds - elapsed));
-      }
-      if (d.test?.proctoringConfig) {
-        setProctoringConfig(d.test.proctoringConfig);
-        setMaxViolations(d.test.proctoringConfig.tabSwitchLimit || 3);
-      }
-      setLoading(false);
-    });
-  }, [token]);
+    })
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.alreadySubmitted || d.expired) {
+          router.push(`/take-test/${token}/submitted`);
+          return;
+        }
+        if (d.submission?.id) setSubIdState(d.submission.id);
+        if (d.questions) setQuestions(d.questions);
+        if (d.submission?.answers) setAnswers(d.submission.answers);
+        if (d.test?.totalDurationSeconds) {
+          setTotalTime(d.test.totalDurationSeconds);
+          const started = new Date(d.submission?.startedAt || Date.now()).getTime();
+          const elapsed = Math.floor((Date.now() - started) / 1000);
+          const rem = Math.max(10, d.test.totalDurationSeconds - elapsed);
+          setTimeLeft(rem);
+        } else {
+          setTimeLeft(3600);
+        }
+        if (d.test?.proctoringConfig) {
+          setProctoringConfig(d.test.proctoringConfig);
+          setMaxViolations(d.test.proctoringConfig.tabSwitchLimit || 3);
+        }
+        setLoading(false);
+      })
+      .catch((err) => {
+        console.error("Start submission error:", err);
+        setLoading(false);
+      });
+  }, [token, router]);
 
   // Timer
   useEffect(() => {
-    if (loading || testEnded) return;
+    if (loading || testEnded || timeLeft === null) return;
     const interval = setInterval(() => {
       setTimeLeft((t) => {
+        if (t === null) return null;
         if (t <= 1) {
           handleAutoSubmit();
           return 0;
@@ -96,16 +116,9 @@ export default function ExamPage({ params }: { params: Promise<{ token: string }
       });
     }, 1000);
     return () => clearInterval(interval);
-  }, [loading, testEnded]);
+  }, [loading, testEnded, timeLeft]);
 
-  const [isGracePeriod, setIsGracePeriod] = useState(true);
-
-  useEffect(() => {
-    const timer = setTimeout(() => setIsGracePeriod(false), 10000);
-    return () => clearTimeout(timer);
-  }, []);
-
-  // Tab switch detection
+  // Tab switch detection (only document.hidden, NO window.blur)
   useEffect(() => {
     if (loading || testEnded || isGracePeriod) return;
 
@@ -115,18 +128,11 @@ export default function ExamPage({ params }: { params: Promise<{ token: string }
       }
     };
 
-    const handleBlur = () => {
-      logViolation("tab_switch");
-    };
-
     document.addEventListener("visibilitychange", handleVisibility);
-    window.addEventListener("blur", handleBlur);
-
     return () => {
       document.removeEventListener("visibilitychange", handleVisibility);
-      window.removeEventListener("blur", handleBlur);
     };
-  }, [loading, testEnded, isGracePeriod, violations]);
+  }, [loading, testEnded, isGracePeriod]);
 
   // Copy/paste/right-click blocking
   useEffect(() => {
@@ -173,7 +179,7 @@ export default function ExamPage({ params }: { params: Promise<{ token: string }
     };
 
     const handleFullscreenChange = () => {
-      if (!document.fullscreenElement && proctoringConfig.fullScreenRequired) {
+      if (!document.fullscreenElement && proctoringConfig.fullScreenRequired && !isGracePeriod) {
         logViolation("fullscreen_exit");
         enterFullscreen();
       }
@@ -185,20 +191,17 @@ export default function ExamPage({ params }: { params: Promise<{ token: string }
     return () => {
       document.removeEventListener("fullscreenchange", handleFullscreenChange);
     };
-  }, [loading, testEnded, proctoringConfig.fullScreenRequired]);
+  }, [loading, testEnded, proctoringConfig.fullScreenRequired, isGracePeriod]);
 
-  // Webcam (Camera + Audio) & Live Screen Stream Capture
+  // Webcam & Screen Stream Capture with Explicit .play() & Snapshot Upload
   useEffect(() => {
     if (loading || testEnded) return;
 
     let webcamStream: MediaStream | null = null;
     let screenStream: MediaStream | null = null;
-    let webcamRecorder: MediaRecorder | null = null;
-    let screenRecorder: MediaRecorder | null = null;
 
     const startProctoringStreams = async () => {
       try {
-        // 1. Camera + Microphone Stream (Reuse pre-verified stream if available)
         if ((window as any).__cameraStream && (window as any).__cameraStream.active) {
           webcamStream = (window as any).__cameraStream;
         } else {
@@ -207,11 +210,11 @@ export default function ExamPage({ params }: { params: Promise<{ token: string }
 
         if (videoRef.current) {
           videoRef.current.srcObject = webcamStream;
-          setCameraActive(true);
+          videoRef.current.play().catch(() => {});
         }
 
         if (window.MediaRecorder && webcamStream) {
-          webcamRecorder = new MediaRecorder(webcamStream);
+          const webcamRecorder = new MediaRecorder(webcamStream);
           webcamRecorderRef.current = webcamRecorder;
           webcamRecorder.ondataavailable = (event: BlobEvent) => {
             if (event.data && event.data.size > 0) {
@@ -225,7 +228,6 @@ export default function ExamPage({ params }: { params: Promise<{ token: string }
       }
 
       try {
-        // 2. Full Screen Recording Stream (Reuse pre-verified stream if available)
         if ((window as any).__screenStream && (window as any).__screenStream.active) {
           screenStream = (window as any).__screenStream;
         } else if (navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia) {
@@ -233,7 +235,7 @@ export default function ExamPage({ params }: { params: Promise<{ token: string }
         }
 
         if (window.MediaRecorder && screenStream) {
-          screenRecorder = new MediaRecorder(screenStream);
+          const screenRecorder = new MediaRecorder(screenStream);
           screenRecorderRef.current = screenRecorder;
           screenRecorder.ondataavailable = (event: BlobEvent) => {
             if (event.data && event.data.size > 0) {
@@ -249,8 +251,8 @@ export default function ExamPage({ params }: { params: Promise<{ token: string }
 
     startProctoringStreams();
 
-    // Fallback periodic canvas snapshot every 10 seconds
-    const captureInterval = setInterval(() => {
+    // Helper to capture canvas frame
+    const captureSnapshot = () => {
       const activeSubId = subIdState || submissionId;
       if (!videoRef.current || !canvasRef.current || !activeSubId) return;
 
@@ -258,11 +260,14 @@ export default function ExamPage({ params }: { params: Promise<{ token: string }
       const canvas = canvasRef.current;
       const ctx = canvas.getContext("2d");
 
-      if (ctx && video.videoWidth > 0) {
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-        const imageUrl = canvas.toDataURL("image/jpeg", 0.5);
+      const width = video.videoWidth || 640;
+      const height = video.videoHeight || 480;
+
+      if (ctx) {
+        canvas.width = width;
+        canvas.height = height;
+        ctx.drawImage(video, 0, 0, width, height);
+        const imageUrl = canvas.toDataURL("image/jpeg", 0.6);
 
         fetch(`/api/submissions/${activeSubId}/webcam-snapshot`, {
           method: "POST",
@@ -270,18 +275,23 @@ export default function ExamPage({ params }: { params: Promise<{ token: string }
           body: JSON.stringify({ imageUrl, event: "proctoring_snapshot" }),
         }).catch(() => {});
       }
-    }, 10000);
+    };
+
+    // Immediate initial snapshot after 1s
+    const initialSnapTimer = setTimeout(captureSnapshot, 1200);
+
+    // Periodic snapshot every 8s
+    const captureInterval = setInterval(captureSnapshot, 8000);
 
     return () => {
+      clearTimeout(initialSnapTimer);
       clearInterval(captureInterval);
-      if (webcamRecorder && webcamRecorder.state !== "inactive") webcamRecorder.stop();
-      if (screenRecorder && screenRecorder.state !== "inactive") screenRecorder.stop();
-      if (webcamStream) webcamStream.getTracks().forEach((track) => track.stop());
-      if (screenStream) screenStream.getTracks().forEach((track) => track.stop());
+      if (webcamRecorderRef.current && webcamRecorderRef.current.state !== "inactive") webcamRecorderRef.current.stop();
+      if (screenRecorderRef.current && screenRecorderRef.current.state !== "inactive") screenRecorderRef.current.stop();
     };
   }, [loading, testEnded, submissionId, subIdState]);
 
-  // Periodic video recording sync every 15 seconds
+  // Periodic Cloudinary upload every 15s
   useEffect(() => {
     if (loading || testEnded) return;
     const activeSubId = subIdState || submissionId;
@@ -296,21 +306,24 @@ export default function ExamPage({ params }: { params: Promise<{ token: string }
 
   const logViolation = async (type: string) => {
     const activeSubId = subIdState || submissionId;
-    const newCount = violations + 1;
-    setViolations(newCount);
-    setShowWarning(true);
 
-    if (activeSubId) {
-      await fetch(`/api/submissions/${activeSubId}/violation`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ type }),
-      });
-    }
+    setViolations((prevCount) => {
+      const nextCount = prevCount + 1;
+      setShowWarning(true);
 
-    if (newCount >= maxViolations) {
-      handleAutoSubmit();
-    }
+      if (activeSubId) {
+        fetch(`/api/submissions/${activeSubId}/violation`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ type }),
+        }).catch(() => {});
+      }
+
+      if (nextCount >= maxViolations) {
+        handleAutoSubmit();
+      }
+      return nextCount;
+    });
   };
 
   const saveAnswer = useCallback(async (answer: Answer) => {
@@ -370,39 +383,53 @@ export default function ExamPage({ params }: { params: Promise<{ token: string }
         formData.append("screenVideo", screenBlob, "screen_recording.webm");
       }
 
-      await fetch(`/api/submissions/${activeSubId}/upload-full-recordings`, {
+      const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+      const res = await fetch(`${apiBase}/api/submissions/${activeSubId}/upload-full-recordings`, {
         method: "POST",
         body: formData,
       });
+
+      const resData = await res.json();
+      console.log("Cloudinary Upload Result:", resData);
     } catch (err) {
       console.warn("Upload recording error:", err);
     }
   };
 
   const handleAutoSubmit = async () => {
+    if (testEnded || submitting) return;
     setTestEnded(true);
     setSubmitting(true);
 
+    const activeSubId = subIdState || submissionId;
+
     await uploadRecordingsToCloudinary();
 
-    await fetch(`/api/submissions/${submissionId}/submit`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ autoSubmitted: true }),
-    });
+    if (activeSubId) {
+      await fetch(`/api/submissions/${activeSubId}/submit`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ autoSubmitted: true }),
+      });
+    }
     router.push(`/take-test/${token}/submitted`);
   };
 
   const handleSubmit = async () => {
+    if (testEnded || submitting) return;
     setSubmitting(true);
+    setTestEnded(true);
+    const activeSubId = subIdState || submissionId;
 
     await uploadRecordingsToCloudinary();
 
-    await fetch(`/api/submissions/${submissionId}/submit`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ autoSubmitted: false }),
-    });
+    if (activeSubId) {
+      await fetch(`/api/submissions/${activeSubId}/submit`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ autoSubmitted: false }),
+      });
+    }
     router.push(`/take-test/${token}/submitted`);
   };
 
@@ -416,8 +443,9 @@ export default function ExamPage({ params }: { params: Promise<{ token: string }
 
   const currentQuestion = questions[currentIdx];
   const currentAnswer = answers.find((a) => a.questionId === currentQuestion?.id);
+  const displayTime = timeLeft !== null ? timeLeft : totalTime;
   const formatTime = (s: number) => `${Math.floor(s / 60).toString().padStart(2, "0")}:${(s % 60).toString().padStart(2, "0")}`;
-  const isWarningTime = timeLeft < 120;
+  const isWarningTime = displayTime < 120;
 
   return (
     <div className="min-h-screen bg-app-bg-subtle dark:bg-app-text flex">
@@ -427,12 +455,12 @@ export default function ExamPage({ params }: { params: Promise<{ token: string }
         <div className="p-4 border-b border-app-border dark:border-dark-border">
           <p className="text-xs text-[var(--text-muted)] mb-1">Time Remaining</p>
           <p className={`text-3xl font-bold tracking-tight ${isWarningTime ? "text-danger" : "text-[var(--text-primary)]"}`}>
-            {formatTime(timeLeft)}
+            {formatTime(displayTime)}
           </p>
           <div className="mt-2 h-1 bg-gray-200 dark:bg-gray-800 rounded-full overflow-hidden">
             <div
               className={`h-full transition-all ${isWarningTime ? "bg-danger" : "bg-[var(--text-primary)]"}`}
-              style={{ width: `${(timeLeft / totalTime) * 100}%` }}
+              style={{ width: `${(displayTime / totalTime) * 100}%` }}
             />
           </div>
         </div>
@@ -604,7 +632,6 @@ export default function ExamPage({ params }: { params: Promise<{ token: string }
                 <Button
                   variant="ghost"
                   onClick={() => {
-                    const current = currentAnswer?.selectedOptionIds || [];
                     updateAnswer({ selectedOptionIds: [], answerText: "", codeAnswer: "" });
                   }}
                 >

@@ -35,7 +35,7 @@ export default function AdminHeader({ title, subtitle }: { title: string; subtit
           )}
         </Button>
         <div className="w-8 h-8 rounded-full bg-[var(--text-primary)] flex items-center justify-center">
-          <span className="text-[var(--bg-color)] text-xs font-semibold">A</span>
+          <span className="text-[var(--bg-color)] text-xs font-bold">B</span>
         </div>
       </div>
     </header>

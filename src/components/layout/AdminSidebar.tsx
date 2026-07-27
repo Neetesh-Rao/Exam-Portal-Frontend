@@ -97,17 +97,17 @@ export default function AdminSidebar() {
     } catch {
       // ignore
     }
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("token");
+    }
     window.location.href = "/login";
   };
 
   return (
     <aside className="w-64 h-screen bg-white dark:bg-dark-bg border-r border-[var(--border-color)] flex flex-col fixed left-0 top-0 z-40">
-      <div className="h-16 flex items-center px-6 border-b border-[var(--border-color)]">
-        <Link href="/admin/dashboard" className="flex items-center gap-2.5">
-          <div className="w-8 h-8 bg-[var(--text-primary)] rounded-lg flex items-center justify-center">
-            <span className="text-[var(--bg-color)] font-bold text-sm">H</span>
-          </div>
-          <span className="text-lg font-bold tracking-tight text-[var(--text-primary)]">HireDesk</span>
+      <div className="h-16 flex items-center px-4 border-b border-[var(--border-color)]">
+        <Link href="/admin/dashboard" className="flex items-center gap-2">
+          <img src="/bitmax-logo.png" alt="Bitmax Technology" className="h-9 w-auto object-contain" />
         </Link>
       </div>
 
@@ -118,11 +118,10 @@ export default function AdminSidebar() {
             <Link
               key={item.href}
               href={item.href}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 ${
-                isActive
+              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 ${isActive
                   ? "bg-gray-100 dark:bg-dark-surface text-[var(--text-primary)]"
                   : "text-[var(--text-secondary)] hover:bg-app-bg-subtle dark:hover:bg-dark-surface hover:text-[var(--text-primary)] dark:hover:text-white"
-              }`}
+                }`}
             >
               <span className={isActive ? "text-[var(--text-primary)]" : ""}>{item.icon}</span>
               {item.label}

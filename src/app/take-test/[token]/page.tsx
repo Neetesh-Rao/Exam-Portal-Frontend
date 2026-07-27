@@ -9,7 +9,12 @@ import { useValidateInviteQuery } from "@/redux/api/invitesApi";
 import { useStartSubmissionMutation } from "@/redux/api/submissionsApi";
 
 export default function TestInstructionsPage({ params }: { params: Promise<{ token: string }> }) {
-  const { token } = use(params);
+  const resolvedParams = use(params);
+  const rawToken = Array.isArray((resolvedParams as any).token)
+    ? (resolvedParams as any).token.join("")
+    : (resolvedParams as any).token || "";
+  const token = String(rawToken).replace(/\//g, "").trim();
+
   const router = useRouter();
   const [agreed, setAgreed] = useState(false);
   const [error, setError] = useState("");
@@ -46,7 +51,8 @@ export default function TestInstructionsPage({ params }: { params: Promise<{ tok
       }
     } catch (err) {
       setScreenReady(true);
-    } fontMethod:
+    }
+
     setPermissionsRequesting(false);
   };
 
@@ -58,9 +64,23 @@ export default function TestInstructionsPage({ params }: { params: Promise<{ tok
 
     try {
       const result = await startSubmission({ token }).unwrap();
-      router.push(`/take-test/${token}/exam?submissionId=${result.submission.id}`);
+
+      if (result?.alreadySubmitted || result?.expired || result?.error === "Test already completed") {
+        router.push(`/take-test/${token}/submitted`);
+        return;
+      }
+
+      if (result?.submission?.id) {
+        router.push(`/take-test/${token}/exam?submissionId=${result.submission.id}`);
+      } else {
+        setError(result?.error || "Failed to initialize test submission");
+      }
     } catch (err: any) {
-      setError(err?.data?.error || "Failed to start submission");
+      if (err?.data?.alreadySubmitted || err?.data?.expired || err?.data?.error === "Test already completed") {
+        router.push(`/take-test/${token}/submitted`);
+        return;
+      }
+      setError(err?.data?.error || err?.message || "Failed to start submission");
     }
   };
 
@@ -72,13 +92,21 @@ export default function TestInstructionsPage({ params }: { params: Promise<{ tok
     );
   }
 
-  if (isError || error || (data && data.error)) {
+  if (isError || error || (data && (data.error || data.alreadySubmitted))) {
+    if (data?.alreadySubmitted || data?.error === "Test already completed") {
+      router.push(`/take-test/${token}/submitted`);
+      return null;
+    }
+
     return (
       <div className="min-h-screen bg-app-bg-subtle dark:bg-app-text flex items-center justify-center p-4">
         <Card className="max-w-md text-center">
           <div className="text-4xl mb-4">⚠️</div>
           <h1 className="text-xl font-bold text-[var(--text-primary)] mb-2">Unable to Access Test</h1>
-          <p className="text-sm text-[var(--text-muted)]">{error || data?.error || "Invalid test link or session expired"}</p>
+          <p className="text-sm text-[var(--text-muted)] mb-4">{error || data?.error || "Invalid test link or session expired"}</p>
+          <Button variant="secondary" onClick={() => router.push(`/take-test/${token}/submitted`)}>
+            View Submission Status
+          </Button>
         </Card>
       </div>
     );
@@ -95,8 +123,8 @@ export default function TestInstructionsPage({ params }: { params: Promise<{ tok
     <div className="min-h-screen bg-app-bg-subtle dark:bg-app-text py-12 px-4">
       <div className="max-w-2xl mx-auto space-y-6">
         <div className="text-center mb-8">
-          <div className="w-12 h-12 bg-black text-white dark:bg-white dark:text-black rounded-xl flex items-center justify-center mx-auto mb-4 font-bold text-xl">
-            H
+          <div className="flex justify-center mb-4">
+            <img src="/bitmax-logo.png" alt="BITMAX Technology" className="h-10 w-auto object-contain" />
           </div>
           <h1 className="text-2xl font-bold text-[var(--text-primary)] tracking-tight">{test?.title}</h1>
           <p className="text-sm text-[var(--text-muted)] mt-1">Welcome, {candidate?.name}</p>

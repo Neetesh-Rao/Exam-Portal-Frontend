@@ -31,7 +31,8 @@ export default function TestDetailPage({ params }: { params: Promise<{ id: strin
 
   const [inviteModal, setInviteModal] = useState(false);
   const [inviteEmails, setInviteEmails] = useState("");
-  const [inviteResults, setInviteResults] = useState<{ token: string; email: string }[]>([]);
+  const [expiryOption, setExpiryOption] = useState<string>("1_hour");
+  const [inviteResults, setInviteResults] = useState<{ token: string; email: string; inviteLink?: string; expiresAt?: string }[]>([]);
 
   const handleSave = async () => {
     try {
@@ -52,8 +53,18 @@ export default function TestDetailPage({ params }: { params: Promise<{ id: strin
 
   const handleInvite = async () => {
     const emails = inviteEmails.split(/[\n,]/).map((e) => e.trim()).filter(Boolean);
+    if (!emails.length) return;
+
+    let payload: any = { testId: id, candidateEmails: emails };
+    if (expiryOption === "1_hour") payload.expiresInHours = 1;
+    else if (expiryOption === "2_hours") payload.expiresInHours = 2;
+    else if (expiryOption === "6_hours") payload.expiresInHours = 6;
+    else if (expiryOption === "24_hours") payload.expiresInHours = 24;
+    else if (expiryOption === "7_days") payload.expiresInDays = 7;
+    else if (expiryOption === "30_days") payload.expiresInDays = 30;
+
     try {
-      const res = await sendInvites({ testId: id, candidateEmails: emails, expiresInDays: 7 }).unwrap();
+      const res = await sendInvites(payload).unwrap();
       setInviteResults(res.invites || []);
     } catch (err) {
       console.error("Invite candidates error:", err);
@@ -132,36 +143,71 @@ export default function TestDetailPage({ params }: { params: Promise<{ id: strin
           </div>
         </Modal>
 
-        <Modal open={inviteModal} onClose={() => { setInviteModal(false); setInviteResults([]); }} title="Invite Candidates" size="lg">
+        <Modal open={inviteModal} onClose={() => { setInviteModal(false); setInviteResults([]); }} title="Invite Candidates to Assessment" size="lg">
           {inviteResults.length > 0 ? (
             <div>
-              <p className="text-sm text-success mb-4">✓ {inviteResults.length} invitations created!</p>
-              <div className="space-y-2 max-h-64 overflow-y-auto">
+              <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-lg text-emerald-600 dark:text-emerald-400 text-sm font-medium mb-4">
+                ✓ {inviteResults.length} invitation(s) created & Nodemailer email dispatches initiated!
+              </div>
+              <div className="space-y-3 max-h-64 overflow-y-auto">
                 {inviteResults.map((inv) => (
-                  <div key={inv.token} className="p-3 border border-app-border dark:border-dark-border rounded-lg">
-                    <p className="text-sm font-medium text-[var(--text-primary)]">{inv.email}</p>
-                    <p className="text-xs text-[var(--text-muted)] mt-1 break-all">
-                      Link: {typeof window !== "undefined" ? window.location.origin : ""}/take-test/{inv.token}
+                  <div key={inv.token} className="p-3 border border-app-border dark:border-dark-border rounded-lg bg-app-bg-subtle/50 dark:bg-dark-surface/50">
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm font-bold text-[var(--text-primary)]">{inv.email}</p>
+                      {inv.expiresAt && (
+                        <span className="text-[11px] font-semibold text-amber-500">
+                          Expires: {new Date(inv.expiresAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-sky-500 mt-1.5 break-all font-mono">
+                      Link: {inv.inviteLink || `${typeof window !== "undefined" ? window.location.origin : ""}/take-test/${inv.token}`}
                     </p>
                   </div>
                 ))}
               </div>
               <div className="flex justify-end mt-4">
-                <Button onClick={() => { setInviteModal(false); setInviteResults([]); }}>Done</Button>
+                <Button onClick={() => { setInviteModal(false); setInviteResults([]); setInviteEmails(""); }}>Done</Button>
               </div>
             </div>
           ) : (
             <div className="space-y-4">
               <Textarea
-                label="Candidate Emails"
+                label="Candidate Email Addresses"
                 value={inviteEmails}
                 onChange={(e) => setInviteEmails(e.target.value)}
-                placeholder="Enter emails separated by commas or new lines..."
+                placeholder="Enter candidate emails (separated by commas or new lines)..."
+                rows={4}
               />
-              <p className="text-xs text-[var(--text-muted)]">Each candidate will receive a unique test link valid for 7 days.</p>
-              <div className="flex justify-end gap-3">
+
+              <div>
+                <label className="block text-sm font-medium text-[var(--text-primary)] mb-1.5">
+                  Assessment Link Expiration Time
+                </label>
+                <select
+                  value={expiryOption}
+                  onChange={(e) => setExpiryOption(e.target.value)}
+                  className="w-full p-2.5 bg-white dark:bg-dark-surface border border-app-border dark:border-dark-border rounded-lg text-sm text-[var(--text-primary)] outline-none focus:border-accent"
+                >
+                  <option value="1_hour">⚡ 1 Hour Expiration</option>
+                  <option value="2_hours">⚡ 2 Hours Expiration</option>
+                  <option value="6_hours">⚡ 6 Hours Expiration</option>
+                  <option value="24_hours">📅 24 Hours (1 Day)</option>
+                  <option value="7_days">📅 7 Days</option>
+                  <option value="30_days">📅 30 Days</option>
+                </select>
+                <p className="text-xs text-[var(--text-muted)] mt-1">
+                  Once expired, candidate clicking the assessment link will be denied access.
+                </p>
+              </div>
+
+              <div className="p-3 bg-sky-500/10 border border-sky-500/20 rounded-lg text-xs text-sky-500 font-medium">
+                📧 Nodemailer will automatically dispatch unique test links to each candidate email address.
+              </div>
+
+              <div className="flex justify-end gap-3 pt-2">
                 <Button variant="secondary" onClick={() => setInviteModal(false)}>Cancel</Button>
-                <Button onClick={handleInvite} loading={inviting}>Send Invitations</Button>
+                <Button onClick={handleInvite} loading={inviting}>Send Email Invitations</Button>
               </div>
             </div>
           )}
