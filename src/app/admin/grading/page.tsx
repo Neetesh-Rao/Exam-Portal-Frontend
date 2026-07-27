@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import AdminHeader from "@/components/layout/AdminHeader";
 import Card from "@/components/ui/Card";
 import Badge from "@/components/ui/Badge";
@@ -8,69 +8,35 @@ import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import { TableSkeleton } from "@/components/ui/Skeleton";
 import EmptyState from "@/components/ui/EmptyState";
-import { Award, CheckCircle2, Edit3, User, BookOpen } from "lucide-react";
-
-interface Submission {
-  id: string;
-  candidateName: string;
-  candidateEmail: string;
-  testTitle: string;
-  autoScore: number;
-  manualScore: number;
-  finalScore: number;
-  status: string;
-  submittedAt: string;
-}
+import { CheckCircle2, BookOpen } from "lucide-react";
+import { useGetSubmissionsQuery, useGradeSubmissionMutation } from "@/redux/api/submissionsApi";
 
 export default function GradingQueuePage() {
-  const [submissions, setSubmissions] = useState<Submission[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [selectedSub, setSelectedSub] = useState<Submission | null>(null);
+  const [selectedSub, setSelectedSub] = useState<any | null>(null);
   const [manualScoreInput, setManualScoreInput] = useState<number>(0);
-  const [grading, setGrading] = useState(false);
 
-  const fetchGradingQueue = async () => {
-    try {
-      const res = await fetch("/api/submissions");
-      const data = await res.json();
-      const mapped = (data.submissions || []).map((s: any) => ({
-        id: s.id || s._id,
-        candidateName: s.candidate?.name || "Candidate",
-        candidateEmail: s.candidate?.email || "candidate@email.com",
-        testTitle: s.test?.title || "Assessment",
-        autoScore: s.autoScore || 0,
-        manualScore: s.manualScore || 0,
-        finalScore: s.finalScore || s.autoScore || 0,
-        status: s.status,
-        submittedAt: s.submittedAt,
-      }));
-      setSubmissions(mapped);
-    } catch (e) {
-      console.error("Failed to load submissions queue", e);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const { data, isLoading: loading } = useGetSubmissionsQuery(undefined);
+  const [gradeSub, { isLoading: grading }] = useGradeSubmissionMutation();
 
-  useEffect(() => {
-    fetchGradingQueue();
-  }, []);
+  const submissions: any[] = (data?.submissions || []).map((s: any) => ({
+    id: s.id || s._id,
+    candidateName: s.candidate?.name || "Candidate",
+    candidateEmail: s.candidate?.email || "candidate@email.com",
+    testTitle: s.test?.title || "Assessment",
+    autoScore: s.autoScore || 0,
+    manualScore: s.manualScore || 0,
+    finalScore: s.finalScore || s.autoScore || 0,
+    status: s.status,
+    submittedAt: s.submittedAt,
+  }));
 
   const handleGrade = async () => {
     if (!selectedSub) return;
-    setGrading(true);
     try {
-      await fetch(`/api/submissions/${selectedSub.id}/grade`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ manualScore: manualScoreInput }),
-      });
+      await gradeSub({ id: selectedSub.id, manualScore: manualScoreInput }).unwrap();
       setSelectedSub(null);
-      fetchGradingQueue();
     } catch (e) {
       console.error("Grading failed", e);
-    } finally {
-      setGrading(false);
     }
   };
 
@@ -95,7 +61,6 @@ export default function GradingQueuePage() {
           </Card>
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Left Queue List */}
             <div className="lg:col-span-2 space-y-4">
               <Card className="!p-0 overflow-hidden">
                 <div className="p-4 bg-app-bg-subtle dark:bg-dark-surface border-b border-app-border dark:border-dark-border font-semibold text-sm flex items-center justify-between text-[var(--text-primary)]">
@@ -120,7 +85,7 @@ export default function GradingQueuePage() {
                           <div className="flex items-center gap-2">
                             <h4 className="font-semibold text-[var(--text-primary)] text-base">{sub.candidateName}</h4>
                             <Badge variant={sub.status === "graded" ? "neutral" : "accent"}>
-                              {sub.status.replace("_", " ")}
+                              {sub.status ? sub.status.replace("_", " ") : "N/A"}
                             </Badge>
                           </div>
                           <p className="text-xs text-[var(--text-muted)]">{sub.candidateEmail} • {sub.testTitle}</p>
@@ -139,7 +104,6 @@ export default function GradingQueuePage() {
               </Card>
             </div>
 
-            {/* Right Grading Panel */}
             <div className="lg:col-span-1">
               {selectedSub ? (
                 <Card className="space-y-6">

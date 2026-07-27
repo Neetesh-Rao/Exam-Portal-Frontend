@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import AdminHeader from "@/components/layout/AdminHeader";
 import Button from "@/components/ui/Button";
 import Badge from "@/components/ui/Badge";
@@ -10,31 +10,30 @@ import Textarea from "@/components/ui/Textarea";
 import Modal from "@/components/ui/Modal";
 import EmptyState from "@/components/ui/EmptyState";
 import { TableSkeleton } from "@/components/ui/Skeleton";
-
-interface Question {
-  id: number;
-  title: string;
-  description: string;
-  type: string;
-  difficulty: string;
-  marks: number;
-  negativeMarks: number;
-  tags: string[];
-  options: { id: string; text: string; isCorrect: boolean }[];
-  correctTextAnswer: string | null;
-  codeConfig: { language: string; starterCode: string; disablePaste: boolean } | null;
-}
+import {
+  useGetQuestionsQuery,
+  useCreateQuestionMutation,
+  useDeleteQuestionMutation,
+} from "@/redux/api/questionsApi";
 
 export default function QuestionsPage() {
-  const [questions, setQuestions] = useState<Question[]>([]);
-  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState("");
   const [diffFilter, setDiffFilter] = useState("");
   const [showCreate, setShowCreate] = useState(false);
-  const [saving, setSaving] = useState(false);
 
-  // Create form
+  const { data, isLoading: loading } = useGetQuestionsQuery(search);
+  const [addQuestion, { isLoading: saving }] = useCreateQuestionMutation();
+  const [removeQuestion] = useDeleteQuestionMutation();
+
+  const questions: any[] = data?.questions || [];
+
+  const filtered = questions.filter((q) => {
+    if (typeFilter && q.type !== typeFilter) return false;
+    if (diffFilter && q.difficulty !== diffFilter) return false;
+    return true;
+  });
+
   const [form, setForm] = useState({
     title: "",
     description: "",
@@ -55,22 +54,7 @@ export default function QuestionsPage() {
     disablePaste: false,
   });
 
-  const loadQuestions = async () => {
-    setLoading(true);
-    const params = new URLSearchParams();
-    if (search) params.set("search", search);
-    if (typeFilter) params.set("type", typeFilter);
-    if (diffFilter) params.set("difficulty", diffFilter);
-    const res = await fetch(`/api/questions?${params}`);
-    const data = await res.json();
-    setQuestions(data.questions || []);
-    setLoading(false);
-  };
-
-  useEffect(() => { loadQuestions(); }, [search, typeFilter, diffFilter]);
-
   const handleCreate = async () => {
-    setSaving(true);
     const payload: Record<string, unknown> = {
       title: form.title,
       description: form.description,
@@ -91,31 +75,31 @@ export default function QuestionsPage() {
       payload.codeConfig = { language: form.codeLanguage, starterCode: form.starterCode, disablePaste: form.disablePaste };
     }
 
-    await fetch("/api/questions", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-
-    setSaving(false);
-    setShowCreate(false);
-    setForm({
-      title: "", description: "", type: "mcq_single", difficulty: "medium", marks: 1, negativeMarks: 0,
-      tags: "", correctTextAnswer: "", options: [
-        { id: "a", text: "", isCorrect: true },
-        { id: "b", text: "", isCorrect: false },
-        { id: "c", text: "", isCorrect: false },
-        { id: "d", text: "", isCorrect: false },
-      ],
-      codeLanguage: "javascript", starterCode: "", disablePaste: false,
-    });
-    loadQuestions();
+    try {
+      await addQuestion(payload).unwrap();
+      setShowCreate(false);
+      setForm({
+        title: "", description: "", type: "mcq_single", difficulty: "medium", marks: 1, negativeMarks: 0,
+        tags: "", correctTextAnswer: "", options: [
+          { id: "a", text: "", isCorrect: true },
+          { id: "b", text: "", isCorrect: false },
+          { id: "c", text: "", isCorrect: false },
+          { id: "d", text: "", isCorrect: false },
+        ],
+        codeLanguage: "javascript", starterCode: "", disablePaste: false,
+      });
+    } catch (err) {
+      console.error("Create question error:", err);
+    }
   };
 
-  const handleDelete = async (id: number) => {
+  const handleDelete = async (id: string | number) => {
     if (!confirm("Delete this question?")) return;
-    await fetch(`/api/questions/${id}`, { method: "DELETE" });
-    loadQuestions();
+    try {
+      await removeQuestion(id).unwrap();
+    } catch (err) {
+      console.error("Delete question error:", err);
+    }
   };
 
   const diffBadge = (d: string) => {
@@ -161,7 +145,7 @@ export default function QuestionsPage() {
 
         {loading ? (
           <Card><TableSkeleton /></Card>
-        ) : questions.length === 0 ? (
+        ) : filtered.length === 0 ? (
           <Card>
             <EmptyState
               title="No questions yet"
@@ -183,13 +167,13 @@ export default function QuestionsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border-default dark:divide-dk-border">
-                {questions.map((q) => (
+                {filtered.map((q: any) => (
                   <tr key={q.id} className="hover:bg-app-bg-subtle dark:hover:bg-dark-surface transition-colors">
                     <td className="px-6 py-4">
                       <p className="text-sm font-medium text-[var(--text-primary)]">{q.title}</p>
                       {q.tags && q.tags.length > 0 && (
                         <div className="flex gap-1 mt-1">
-                          {q.tags.map((tag, i) => <Badge key={i} variant="neutral">{tag}</Badge>)}
+                          {q.tags.map((tag: string, i: number) => <Badge key={i} variant="neutral">{tag}</Badge>)}
                         </div>
                       )}
                     </td>
@@ -208,7 +192,6 @@ export default function QuestionsPage() {
           </Card>
         )}
 
-        {/* Create Modal */}
         <Modal open={showCreate} onClose={() => setShowCreate(false)} title="Add Question" size="lg">
           <div className="space-y-4 max-h-[70vh] overflow-y-auto">
             <Input label="Title" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="Enter question title" />
@@ -247,7 +230,6 @@ export default function QuestionsPage() {
 
             <Input label="Tags (comma separated)" value={form.tags} onChange={(e) => setForm({ ...form, tags: e.target.value })} placeholder="javascript, react, frontend" />
 
-            {/* MCQ Options */}
             {["mcq_single", "mcq_multi", "true_false"].includes(form.type) && (
               <div>
                 <label className="block text-sm font-medium text-[var(--text-primary)] mb-2">Options</label>

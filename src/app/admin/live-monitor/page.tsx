@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import AdminHeader from "@/components/layout/AdminHeader";
 import Card from "@/components/ui/Card";
 import Badge from "@/components/ui/Badge";
@@ -8,49 +8,21 @@ import Button from "@/components/ui/Button";
 import Modal from "@/components/ui/Modal";
 import { TableSkeleton } from "@/components/ui/Skeleton";
 import EmptyState from "@/components/ui/EmptyState";
-import { Activity, ShieldAlert, AlertTriangle, CheckCircle, RefreshCw, Eye, Video, X } from "lucide-react";
+import { RefreshCw, Eye, Video } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-
-interface LiveSession {
-  id: string;
-  candidateName: string;
-  candidateEmail: string;
-  testTitle: string;
-  status: string;
-  startedAt: string;
-  submittedAt: string | null;
-  violationCount: number;
-  lastViolationType: string | null;
-  tabSwitchLimit: number;
-}
+import { useGetLiveMonitorSessionsQuery } from "@/redux/api/liveMonitorApi";
 
 export default function LiveMonitorPage() {
-  const [sessions, setSessions] = useState<LiveSession[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [activeStreamSession, setActiveStreamSession] = useState<LiveSession | null>(null);
+  const [activeStreamSession, setActiveStreamSession] = useState<any | null>(null);
   const [streamSnapshots, setStreamSnapshots] = useState<{ timestamp: string; imageUrl: string; event?: string }[]>([]);
 
-  const fetchLiveSessions = async () => {
-    try {
-      const res = await fetch("/api/live-monitor");
-      const data = await res.json();
-      setSessions(data.sessions || []);
-    } catch (e) {
-      console.error("Failed to load live sessions", e);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  };
+  const { data, isLoading: loading, refetch, isFetching } = useGetLiveMonitorSessionsQuery(undefined, {
+    pollingInterval: 5000,
+  });
 
-  useEffect(() => {
-    fetchLiveSessions();
-    const interval = setInterval(fetchLiveSessions, 5000); // 5s live polling
-    return () => clearInterval(interval);
-  }, []);
+  const sessions: any[] = data?.sessions || [];
 
-  const openStreamModal = async (session: LiveSession) => {
+  const openStreamModal = async (session: any) => {
     setActiveStreamSession(session);
     try {
       const res = await fetch(`/api/submissions/${session.id}`);
@@ -62,8 +34,7 @@ export default function LiveMonitorPage() {
   };
 
   const handleManualRefresh = () => {
-    setRefreshing(true);
-    fetchLiveSessions();
+    refetch();
   };
 
   const getStatusBadge = (status: string, violations: number, limit: number) => {
@@ -87,7 +58,6 @@ export default function LiveMonitorPage() {
       />
 
       <div className="p-8 max-w-7xl mx-auto space-y-6">
-        {/* Top Control Bar */}
         <Card className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <span className="relative flex h-3 w-3">
@@ -105,7 +75,7 @@ export default function LiveMonitorPage() {
               variant="secondary"
               size="sm"
               onClick={handleManualRefresh}
-              loading={refreshing}
+              loading={isFetching}
               className="text-xs"
             >
               <RefreshCw className="w-3.5 h-3.5 mr-1.5" />
@@ -114,7 +84,6 @@ export default function LiveMonitorPage() {
           </div>
         </Card>
 
-        {/* Live Grid */}
         {loading ? (
           <Card>
             <TableSkeleton />
@@ -141,7 +110,7 @@ export default function LiveMonitorPage() {
               </thead>
               <tbody className="divide-y divide-app-border dark:divide-dark-border text-sm">
                 <AnimatePresence>
-                  {sessions.map((session) => {
+                  {sessions.map((session: any) => {
                     const isFlagged = session.violationCount >= session.tabSwitchLimit;
 
                     return (
@@ -210,7 +179,6 @@ export default function LiveMonitorPage() {
           </Card>
         )}
 
-        {/* Live Proctoring Video Stream Modal */}
         <Modal
           open={!!activeStreamSession}
           onClose={() => setActiveStreamSession(null)}

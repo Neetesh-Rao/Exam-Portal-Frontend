@@ -1,6 +1,5 @@
 "use client";
-import { useEffect, useState, use } from "react";
-import { useRouter } from "next/navigation";
+import { useState, use } from "react";
 import AdminHeader from "@/components/layout/AdminHeader";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
@@ -9,74 +8,56 @@ import Card from "@/components/ui/Card";
 import Badge from "@/components/ui/Badge";
 import Modal from "@/components/ui/Modal";
 import { CardSkeleton } from "@/components/ui/Skeleton";
-
-interface Test {
-  id: number;
-  title: string;
-  description: string;
-  status: string;
-  totalDurationSeconds: number;
-  passPercentage: number;
-  sections: { title: string; questionIds: number[]; timeLimitSeconds: number; randomizeQuestions: boolean }[];
-  proctoringConfig: { tabSwitchLimit: number; fullScreenRequired: boolean; webcamRequired: boolean; disableCopyPaste: boolean; disableRightClick: boolean };
-}
+import {
+  useGetTestByIdQuery,
+  useUpdateTestMutation,
+  usePublishTestMutation,
+} from "@/redux/api/testsApi";
+import { useSendBulkInvitesMutation } from "@/redux/api/invitesApi";
 
 export default function TestDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
-  const router = useRouter();
-  const [test, setTest] = useState<Test | null>(null);
-  const [loading, setLoading] = useState(true);
+
+  const { data, isLoading: loading } = useGetTestByIdQuery(id);
+  const [updateTest, { isLoading: saving }] = useUpdateTestMutation();
+  const [publishTest] = usePublishTestMutation();
+  const [sendInvites, { isLoading: inviting }] = useSendBulkInvitesMutation();
+
+  const test = data?.test;
+
   const [editing, setEditing] = useState(false);
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [saving, setSaving] = useState(false);
+  const [title, setTitle] = useState(test?.title || "");
+  const [description, setDescription] = useState(test?.description || "");
+
   const [inviteModal, setInviteModal] = useState(false);
   const [inviteEmails, setInviteEmails] = useState("");
-  const [inviting, setInviting] = useState(false);
   const [inviteResults, setInviteResults] = useState<{ token: string; email: string }[]>([]);
 
-  useEffect(() => {
-    fetch(`/api/tests/${id}`).then(r => r.json()).then(d => {
-      setTest(d.test);
-      setTitle(d.test?.title || "");
-      setDescription(d.test?.description || "");
-      setLoading(false);
-    });
-  }, [id]);
-
   const handleSave = async () => {
-    setSaving(true);
-    await fetch(`/api/tests/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title, description }),
-    });
-    setEditing(false);
-    setSaving(false);
-    // Reload
-    const r = await fetch(`/api/tests/${id}`);
-    const d = await r.json();
-    setTest(d.test);
+    try {
+      await updateTest({ id, title: title || test?.title, description }).unwrap();
+      setEditing(false);
+    } catch (err) {
+      console.error("Update test error:", err);
+    }
   };
 
   const handlePublish = async () => {
-    await fetch(`/api/tests/${id}/publish`, { method: "POST" });
-    const r = await fetch(`/api/tests/${id}`);
-    const d = await r.json();
-    setTest(d.test);
+    try {
+      await publishTest(id).unwrap();
+    } catch (err) {
+      console.error("Publish test error:", err);
+    }
   };
 
   const handleInvite = async () => {
-    setInviting(true);
-    const emails = inviteEmails.split(/[\n,]/).map(e => e.trim()).filter(Boolean);
-    const res = await fetch("/api/invites/bulk", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ testId: id, candidateEmails: emails, expiresInDays: 7 }),
-    });
-    const data = await res.json();
-    setInviteResults(data.invites || []);
-    setInviting(false);
+    const emails = inviteEmails.split(/[\n,]/).map((e) => e.trim()).filter(Boolean);
+    try {
+      const res = await sendInvites({ testId: id, candidateEmails: emails, expiresInDays: 7 }).unwrap();
+      setInviteResults(res.invites || []);
+    } catch (err) {
+      console.error("Invite candidates error:", err);
+    }
   };
 
   if (loading) return (
@@ -93,29 +74,27 @@ export default function TestDetailPage({ params }: { params: Promise<{ id: strin
     </div>
   );
 
-  const totalQuestions = (test.sections || []).reduce((sum, s) => sum + (s.questionIds?.length || 0), 0);
+  const totalQuestions = (test.sections || []).reduce((sum: number, s: any) => sum + (s.questionIds?.length || 0), 0);
 
   return (
     <div>
       <AdminHeader title={test.title} subtitle={`Test #${test.id}`} />
       <div className="p-8 max-w-4xl mx-auto space-y-6">
-        {/* Actions */}
         <div className="flex items-center gap-3">
           {test.status === "draft" && (
             <Button onClick={handlePublish}>Publish Test</Button>
           )}
-          <Button variant="secondary" onClick={() => setEditing(true)}>Edit Details</Button>
+          <Button variant="secondary" onClick={() => { setTitle(test.title); setDescription(test.description || ""); setEditing(true); }}>Edit Details</Button>
           <Button variant="secondary" onClick={() => setInviteModal(true)}>Invite Candidates</Button>
           <Badge variant={test.status === "published" ? "success" : "warning"}>{test.status}</Badge>
         </div>
 
-        {/* Details */}
         <Card>
           <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-4">Test Details</h3>
           <div className="grid grid-cols-2 gap-4">
             <div>
               <p className="text-xs text-[var(--text-muted)] mb-1">Duration</p>
-              <p className="text-sm font-medium text-[var(--text-primary)]">{Math.floor(test.totalDurationSeconds / 60)} minutes</p>
+              <p className="text-sm font-medium text-[var(--text-primary)]">{Math.floor((test.totalDurationSeconds || 3600) / 60)} minutes</p>
             </div>
             <div>
               <p className="text-xs text-[var(--text-muted)] mb-1">Pass Percentage</p>
@@ -132,7 +111,6 @@ export default function TestDetailPage({ params }: { params: Promise<{ id: strin
           </div>
         </Card>
 
-        {/* Proctoring */}
         <Card>
           <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-4">Proctoring Settings</h3>
           <div className="flex flex-wrap gap-2">
@@ -143,7 +121,6 @@ export default function TestDetailPage({ params }: { params: Promise<{ id: strin
           </div>
         </Card>
 
-        {/* Edit Modal */}
         <Modal open={editing} onClose={() => setEditing(false)} title="Edit Test">
           <div className="space-y-4">
             <Input label="Title" value={title} onChange={(e) => setTitle(e.target.value)} />
@@ -155,7 +132,6 @@ export default function TestDetailPage({ params }: { params: Promise<{ id: strin
           </div>
         </Modal>
 
-        {/* Invite Modal */}
         <Modal open={inviteModal} onClose={() => { setInviteModal(false); setInviteResults([]); }} title="Invite Candidates" size="lg">
           {inviteResults.length > 0 ? (
             <div>

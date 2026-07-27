@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import AdminHeader from "@/components/layout/AdminHeader";
 import Button from "@/components/ui/Button";
 import Badge from "@/components/ui/Badge";
@@ -8,47 +8,30 @@ import Input from "@/components/ui/Input";
 import Modal from "@/components/ui/Modal";
 import EmptyState from "@/components/ui/EmptyState";
 import { TableSkeleton } from "@/components/ui/Skeleton";
-
-interface Candidate {
-  id: number;
-  name: string;
-  email: string;
-  phone: string | null;
-  source: string | null;
-  createdAt: string;
-}
+import { useGetCandidatesQuery, useCreateCandidateMutation } from "@/redux/api/candidatesApi";
 
 export default function CandidatesPage() {
-  const [candidates, setCandidates] = useState<Candidate[]>([]);
-  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [showCreate, setShowCreate] = useState(false);
-  const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({ name: "", email: "", phone: "", source: "" });
 
-  const loadCandidates = async () => {
-    setLoading(true);
-    const params = new URLSearchParams();
-    if (search) params.set("search", search);
-    const res = await fetch(`/api/candidates?${params}`);
-    const data = await res.json();
-    setCandidates(data.candidates || []);
-    setLoading(false);
-  };
+  const { data, isLoading: loading } = useGetCandidatesQuery(undefined);
+  const [addCandidate, { isLoading: saving }] = useCreateCandidateMutation();
 
-  useEffect(() => { loadCandidates(); }, [search]);
+  const candidates: any[] = data?.candidates || [];
+  const filtered = candidates.filter((c) =>
+    c.name.toLowerCase().includes(search.toLowerCase()) ||
+    c.email.toLowerCase().includes(search.toLowerCase())
+  );
 
   const handleCreate = async () => {
-    setSaving(true);
-    await fetch("/api/candidates", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(form),
-    });
-    setSaving(false);
-    setShowCreate(false);
-    setForm({ name: "", email: "", phone: "", source: "" });
-    loadCandidates();
+    try {
+      await addCandidate(form).unwrap();
+      setShowCreate(false);
+      setForm({ name: "", email: "", phone: "", source: "" });
+    } catch (err) {
+      console.error("Create candidate error:", err);
+    }
   };
 
   return (
@@ -62,7 +45,7 @@ export default function CandidatesPage() {
 
         {loading ? (
           <Card><TableSkeleton /></Card>
-        ) : candidates.length === 0 ? (
+        ) : filtered.length === 0 ? (
           <Card>
             <EmptyState
               title="No candidates yet"
@@ -84,12 +67,12 @@ export default function CandidatesPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border-default dark:divide-dk-border">
-                {candidates.map((c) => (
+                {filtered.map((c: any) => (
                   <tr key={c.id} className="hover:bg-app-bg-subtle dark:hover:bg-dark-surface transition-colors">
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
                         <div className="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-sm font-medium text-[var(--text-secondary)]">
-                          {c.name.charAt(0).toUpperCase()}
+                          {c.name ? c.name.charAt(0).toUpperCase() : "C"}
                         </div>
                         <span className="text-sm font-medium text-[var(--text-primary)]">{c.name}</span>
                       </div>

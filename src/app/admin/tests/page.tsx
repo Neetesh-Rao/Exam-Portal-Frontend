@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import AdminHeader from "@/components/layout/AdminHeader";
 import Button from "@/components/ui/Button";
@@ -8,42 +8,25 @@ import Card from "@/components/ui/Card";
 import Input from "@/components/ui/Input";
 import EmptyState from "@/components/ui/EmptyState";
 import { TableSkeleton } from "@/components/ui/Skeleton";
-
-interface Test {
-  id: number;
-  title: string;
-  description: string;
-  status: string;
-  totalDurationSeconds: number;
-  passPercentage: number;
-  sections: { questionIds: number[] }[];
-  createdAt: string;
-}
+import { useGetTestsQuery, useDeleteTestMutation } from "@/redux/api/testsApi";
 
 export default function TestsPage() {
-  const [tests, setTests] = useState<Test[]>([]);
-  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const { data, isLoading: loading } = useGetTestsQuery(undefined);
+  const [removeTest] = useDeleteTestMutation();
 
-  useEffect(() => {
-    loadTests();
-  }, []);
+  const tests = data?.tests || [];
 
-  const loadTests = async () => {
-    setLoading(true);
-    const res = await fetch("/api/tests");
-    const data = await res.json();
-    setTests(data.tests || []);
-    setLoading(false);
-  };
-
-  const deleteTest = async (id: number) => {
+  const deleteTestHandler = async (id: string | number) => {
     if (!confirm("Are you sure you want to delete this test?")) return;
-    await fetch(`/api/tests/${id}`, { method: "DELETE" });
-    loadTests();
+    try {
+      await removeTest(id).unwrap();
+    } catch (error) {
+      console.error("Failed to delete test:", error);
+    }
   };
 
-  const filtered = tests.filter((t) => t.title.toLowerCase().includes(search.toLowerCase()));
+  const filtered = tests.filter((t: any) => t.title.toLowerCase().includes(search.toLowerCase()));
 
   const statusBadge = (s: string) => {
     const map: Record<string, "success" | "warning" | "neutral"> = { published: "success", draft: "warning", archived: "neutral" };
@@ -91,7 +74,7 @@ export default function TestsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border-default dark:divide-dk-border">
-                {filtered.map((test) => (
+                {filtered.map((test: any) => (
                   <tr key={test.id} className="hover:bg-app-bg-subtle dark:hover:bg-dark-surface transition-colors">
                     <td className="px-6 py-4">
                       <Link href={`/admin/tests/${test.id}`} className="text-sm font-medium text-[var(--text-primary)] hover:text-accent">
@@ -100,15 +83,15 @@ export default function TestsPage() {
                       {test.description && <p className="text-xs text-[var(--text-muted)] mt-0.5 line-clamp-1">{test.description}</p>}
                     </td>
                     <td className="px-6 py-4">{statusBadge(test.status)}</td>
-                    <td className="px-6 py-4 text-sm text-[var(--text-secondary)]">{Math.floor(test.totalDurationSeconds / 60)} min</td>
-                    <td className="px-6 py-4 text-sm text-[var(--text-secondary)]">{(test.sections || []).reduce((sum, s) => sum + (s.questionIds?.length || 0), 0)}</td>
+                    <td className="px-6 py-4 text-sm text-[var(--text-secondary)]">{Math.floor((test.totalDurationSeconds || 3600) / 60)} min</td>
+                    <td className="px-6 py-4 text-sm text-[var(--text-secondary)]">{(test.sections || []).reduce((sum: number, s: any) => sum + (s.questionIds?.length || 0), 0)}</td>
                     <td className="px-6 py-4 text-sm text-[var(--text-secondary)]">{test.passPercentage}%</td>
                     <td className="px-6 py-4 text-right">
                       <div className="flex items-center justify-end gap-2">
                         <Link href={`/admin/tests/${test.id}`}>
                           <Button variant="ghost" size="sm">View Details</Button>
                         </Link>
-                        <Button variant="ghost" size="sm" onClick={() => deleteTest(test.id)}>
+                        <Button variant="ghost" size="sm" onClick={() => deleteTestHandler(test.id)}>
                           <span className="text-danger">Delete</span>
                         </Button>
                       </div>

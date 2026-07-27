@@ -1,64 +1,34 @@
 "use client";
-import { useEffect, useState, use } from "react";
+import { useState, use } from "react";
 import { useRouter } from "next/navigation";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 import Badge from "@/components/ui/Badge";
-import { Camera, Monitor, CheckCircle, AlertTriangle, ShieldCheck } from "lucide-react";
-
-interface TestData {
-  invite: { id: number; status: string; expiresAt: string };
-  test: {
-    id: number;
-    title: string;
-    description: string;
-    totalDurationSeconds: number;
-    proctoringConfig: {
-      tabSwitchLimit: number;
-      fullScreenRequired: boolean;
-      webcamRequired: boolean;
-      disableCopyPaste: boolean;
-      disableRightClick: boolean;
-    };
-  };
-  candidate: { id: number; name: string; email: string };
-}
+import { Camera, Monitor, ShieldCheck } from "lucide-react";
+import { useValidateInviteQuery } from "@/redux/api/invitesApi";
+import { useStartSubmissionMutation } from "@/redux/api/submissionsApi";
 
 export default function TestInstructionsPage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = use(params);
   const router = useRouter();
-  const [data, setData] = useState<TestData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
   const [agreed, setAgreed] = useState(false);
-  const [starting, setStarting] = useState(false);
+  const [error, setError] = useState("");
 
-  // Pre-test Device Setup States
   const [cameraReady, setCameraReady] = useState(false);
   const [screenReady, setScreenReady] = useState(false);
   const [permissionsRequesting, setPermissionsRequesting] = useState(false);
 
-  useEffect(() => {
-    fetch(`/api/invites/${token}/validate`)
-      .then((r) => r.json())
-      .then((d) => {
-        if (d.error) setError(d.error);
-        else setData(d);
-        setLoading(false);
-      })
-      .catch(() => { setError("Failed to load test"); setLoading(false); });
-  }, [token]);
+  const { data, isLoading: loading, isError } = useValidateInviteQuery(token);
+  const [startSubmission, { isLoading: starting }] = useStartSubmissionMutation();
 
   const handleDeviceSetup = async () => {
     setPermissionsRequesting(true);
     
-    // 1. Request Camera & Mic
     try {
       const camStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
       (window as any).__cameraStream = camStream;
       setCameraReady(true);
     } catch (err) {
-      console.warn("Camera + Mic error, trying video only:", err);
       try {
         const camStream = await navigator.mediaDevices.getUserMedia({ video: true });
         (window as any).__cameraStream = camStream;
@@ -68,7 +38,6 @@ export default function TestInstructionsPage({ params }: { params: Promise<{ tok
       }
     }
 
-    // 2. Request Screen Sharing ({ video: true })
     try {
       if (navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia) {
         const scrStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
@@ -76,12 +45,9 @@ export default function TestInstructionsPage({ params }: { params: Promise<{ tok
         setScreenReady(true);
       }
     } catch (err) {
-      console.warn("Screen share cancelled or unsupported:", err);
-      // Mark screen ready if user cancelled popup to allow entry
       setScreenReady(true);
-    } finally {
-      setPermissionsRequesting(false);
-    }
+    } fontMethod:
+    setPermissionsRequesting(false);
   };
 
   const handleStart = async () => {
@@ -90,19 +56,12 @@ export default function TestInstructionsPage({ params }: { params: Promise<{ tok
       return;
     }
 
-    setStarting(true);
-    const res = await fetch("/api/submissions/start", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ token }),
-    });
-    const result = await res.json();
-    if (result.error) {
-      setError(result.error);
-      setStarting(false);
-      return;
+    try {
+      const result = await startSubmission({ token }).unwrap();
+      router.push(`/take-test/${token}/exam?submissionId=${result.submission.id}`);
+    } catch (err: any) {
+      setError(err?.data?.error || "Failed to start submission");
     }
-    router.push(`/take-test/${token}/exam?submissionId=${result.submission.id}`);
   };
 
   if (loading) {
@@ -113,13 +72,13 @@ export default function TestInstructionsPage({ params }: { params: Promise<{ tok
     );
   }
 
-  if (error) {
+  if (isError || error || (data && data.error)) {
     return (
       <div className="min-h-screen bg-app-bg-subtle dark:bg-app-text flex items-center justify-center p-4">
         <Card className="max-w-md text-center">
           <div className="text-4xl mb-4">⚠️</div>
           <h1 className="text-xl font-bold text-[var(--text-primary)] mb-2">Unable to Access Test</h1>
-          <p className="text-sm text-[var(--text-muted)]">{error}</p>
+          <p className="text-sm text-[var(--text-muted)]">{error || data?.error || "Invalid test link or session expired"}</p>
         </Card>
       </div>
     );
@@ -128,26 +87,24 @@ export default function TestInstructionsPage({ params }: { params: Promise<{ tok
   if (!data) return null;
 
   const { test, candidate } = data;
-  const duration = Math.floor(test.totalDurationSeconds / 60);
-  const proctoring = test.proctoringConfig;
+  const duration = Math.floor((test?.totalDurationSeconds || 3600) / 60);
+  const proctoring = test?.proctoringConfig || { tabSwitchLimit: 3 };
   const isDevicesReady = cameraReady && screenReady;
 
   return (
     <div className="min-h-screen bg-app-bg-subtle dark:bg-app-text py-12 px-4">
       <div className="max-w-2xl mx-auto space-y-6">
-        {/* Header */}
         <div className="text-center mb-8">
           <div className="w-12 h-12 bg-black text-white dark:bg-white dark:text-black rounded-xl flex items-center justify-center mx-auto mb-4 font-bold text-xl">
             H
           </div>
-          <h1 className="text-2xl font-bold text-[var(--text-primary)] tracking-tight">{test.title}</h1>
-          <p className="text-sm text-[var(--text-muted)] mt-1">Welcome, {candidate.name}</p>
+          <h1 className="text-2xl font-bold text-[var(--text-primary)] tracking-tight">{test?.title}</h1>
+          <p className="text-sm text-[var(--text-muted)] mt-1">Welcome, {candidate?.name}</p>
         </div>
 
-        {/* Test Info */}
         <Card>
           <h2 className="text-lg font-semibold text-[var(--text-primary)] mb-4">Test Overview</h2>
-          {test.description && <p className="text-sm text-[var(--text-secondary)] mb-4">{test.description}</p>}
+          {test?.description && <p className="text-sm text-[var(--text-secondary)] mb-4">{test.description}</p>}
           <div className="grid grid-cols-2 gap-4">
             <div className="p-3 bg-app-bg-subtle dark:bg-dark-surface rounded-lg">
               <p className="text-xs text-[var(--text-muted)]">Duration</p>
@@ -160,7 +117,6 @@ export default function TestInstructionsPage({ params }: { params: Promise<{ tok
           </div>
         </Card>
 
-        {/* Mandatory Pre-Exam Device & Screen Check */}
         <Card className="border-2 border-emerald-500/30 bg-emerald-500/5 space-y-4">
           <div className="flex items-center gap-2">
             <ShieldCheck className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
@@ -207,7 +163,6 @@ export default function TestInstructionsPage({ params }: { params: Promise<{ tok
           </Button>
         </Card>
 
-        {/* Rules */}
         <Card>
           <h2 className="text-lg font-semibold text-[var(--text-primary)] mb-4">Proctoring & Assessment Rules</h2>
           <ul className="space-y-3 text-xs text-[var(--text-secondary)]">
@@ -230,7 +185,6 @@ export default function TestInstructionsPage({ params }: { params: Promise<{ tok
           </ul>
         </Card>
 
-        {/* Agreement */}
         <Card>
           <label className="flex items-start gap-3 cursor-pointer">
             <input
@@ -245,7 +199,6 @@ export default function TestInstructionsPage({ params }: { params: Promise<{ tok
           </label>
         </Card>
 
-        {/* Start Button */}
         <div className="flex justify-center pt-2">
           <Button
             onClick={handleStart}

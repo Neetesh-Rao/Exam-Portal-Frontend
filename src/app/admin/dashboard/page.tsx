@@ -1,35 +1,18 @@
 "use client";
-import { useEffect, useState } from "react";
 import AdminHeader from "@/components/layout/AdminHeader";
 import Card from "@/components/ui/Card";
 import Badge from "@/components/ui/Badge";
 import { CardSkeleton } from "@/components/ui/Skeleton";
-
-interface Stats {
-  totalTests: number;
-  publishedTests: number;
-  totalCandidates: number;
-  totalSubmissions: number;
-  totalInvites: number;
-  avgScore: number;
-}
+import { useGetAnalyticsOverviewQuery } from "@/redux/api/analyticsApi";
 
 export default function DashboardPage() {
-  const [stats, setStats] = useState<Stats | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    fetch("/api/analytics/overview")
-      .then((r) => r.json())
-      .then((d) => { setStats(d); setLoading(false); })
-      .catch(() => setLoading(false));
-  }, []);
+  const { data: stats, isLoading: loading } = useGetAnalyticsOverviewQuery(undefined);
 
   const statCards = stats ? [
-    { label: "Total Tests", value: stats.totalTests, icon: "📋", change: `${stats.publishedTests} published` },
-    { label: "Candidates", value: stats.totalCandidates, icon: "👥", change: `${stats.totalInvites} invited` },
-    { label: "Submissions", value: stats.totalSubmissions, icon: "📄", change: "All time" },
-    { label: "Avg Score", value: `${stats.avgScore}%`, icon: "📊", change: "Across all tests" },
+    { label: "Total Tests", value: stats.totalTests || 0, icon: "📋", change: `${stats.publishedTests || 0} published` },
+    { label: "Candidates", value: stats.totalCandidates || 0, icon: "👥", change: `${stats.totalInvites || 0} invited` },
+    { label: "Submissions", value: stats.totalSubmissions || 0, icon: "📄", change: "All time" },
+    { label: "Avg Score", value: `${stats.avgScore || 0}%`, icon: "📊", change: "Across all tests" },
   ] : [];
 
   return (

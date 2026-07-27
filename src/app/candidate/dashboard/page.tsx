@@ -1,48 +1,29 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import Card from "@/components/ui/Card";
 import Badge from "@/components/ui/Badge";
-import Button from "@/components/ui/Button";
 import { TableSkeleton } from "@/components/ui/Skeleton";
 import EmptyState from "@/components/ui/EmptyState";
-import { Clock, ShieldAlert, CheckCircle2, ArrowRight, Award, User, LogOut } from "lucide-react";
+import { Clock, ShieldAlert, CheckCircle2, ArrowRight, Award, LogOut } from "lucide-react";
 import { useRouter } from "next/navigation";
-
-interface TestInvite {
-  id: string;
-  token: string;
-  status: "invited" | "started" | "completed" | "expired";
-  expiresAt: string;
-  createdAt: string;
-  test: {
-    id: string;
-    title: string;
-    description: string;
-    totalDurationSeconds: number;
-    passPercentage: number;
-  } | null;
-}
+import { useGetCandidateTestsQuery } from "@/redux/api/candidatesApi";
+import { useLogoutMutation } from "@/redux/api/authApi";
 
 export default function CandidateDashboardPage() {
-  const [invites, setInvites] = useState<TestInvite[]>([]);
-  const [loading, setLoading] = useState(true);
   const router = useRouter();
+  const { data, isLoading: loading } = useGetCandidateTestsQuery(undefined);
+  const [logout] = useLogoutMutation();
 
-  useEffect(() => {
-    fetch("/api/candidate/tests")
-      .then((r) => r.json())
-      .then((d) => {
-        setInvites(d.invites || []);
-        setLoading(false);
-      })
-      .catch(() => setLoading(false));
-  }, []);
+  const invites: any[] = data?.invites || [];
 
   const handleLogout = async () => {
-    await fetch("/api/auth/logout", { method: "POST" });
+    try {
+      await logout({}).unwrap();
+    } catch {
+      // ignore
+    }
     router.push("/login");
   };
 
@@ -61,7 +42,6 @@ export default function CandidateDashboardPage() {
 
   return (
     <div className="min-h-screen bg-neutral-950 text-neutral-100 font-sans">
-      {/* Header Bar */}
       <header className="border-b border-neutral-800 bg-neutral-900/90 backdrop-blur sticky top-0 z-30">
         <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -86,9 +66,7 @@ export default function CandidateDashboardPage() {
         </div>
       </header>
 
-      {/* Main Container */}
       <main className="max-w-6xl mx-auto px-6 py-10 space-y-8">
-        {/* Welcome Card */}
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
@@ -106,18 +84,17 @@ export default function CandidateDashboardPage() {
 
           <div className="flex items-center gap-6 bg-neutral-950/80 p-4 rounded-xl border border-neutral-800">
             <div className="text-center">
-              <p className="text-2xl font-bold text-white">{invites.filter((i) => i.status !== "completed").length}</p>
+              <p className="text-2xl font-bold text-white">{invites.filter((i: any) => i.status !== "completed").length}</p>
               <p className="text-xs text-neutral-400">Pending</p>
             </div>
             <div className="w-px h-8 bg-neutral-800"></div>
             <div className="text-center">
-              <p className="text-2xl font-bold text-white">{invites.filter((i) => i.status === "completed").length}</p>
+              <p className="text-2xl font-bold text-white">{invites.filter((i: any) => i.status === "completed").length}</p>
               <p className="text-xs text-neutral-400">Completed</p>
             </div>
           </div>
         </motion.div>
 
-        {/* Tests List */}
         <div className="space-y-4">
           <h3 className="text-lg font-semibold text-white tracking-tight flex items-center gap-2">
             <span>Available Tests</span>
@@ -136,7 +113,7 @@ export default function CandidateDashboardPage() {
             </Card>
           ) : (
             <div className="grid gap-4">
-              {invites.map((invite) => {
+              {invites.map((invite: any) => {
                 const durationMinutes = Math.floor((invite.test?.totalDurationSeconds || 3600) / 60);
                 const isCompleted = invite.status === "completed";
                 const isExpired = invite.status === "expired";
