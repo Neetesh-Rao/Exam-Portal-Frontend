@@ -57,12 +57,31 @@ export default function SubmissionDetailPage({ params }: { params: Promise<{ id:
   const [activeSnapshotIdx, setActiveSnapshotIdx] = useState<number>(0);
   const [isPlayingVideo, setIsPlayingVideo] = useState<boolean>(false);
 
+  const getApiUrl = (path: string) => {
+    const base = process.env.NEXT_PUBLIC_API_URL || "";
+    return base ? `${base}/api${path}` : `/api${path}`;
+  };
+
+  const getAuthHeaders = (): Record<string, string> => {
+    const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+    return {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    };
+  };
+
   useEffect(() => {
-    fetch(`/api/submissions/${id}`).then((r) => r.json()).then((d) => {
-      setData(d);
-      setManualScore(d.submission?.manualScore || 0);
-      setLoading(false);
-    });
+    fetch(getApiUrl(`/submissions/${id}`), {
+      headers: getAuthHeaders(),
+      credentials: "include",
+    })
+      .then((r) => r.json())
+      .then((d) => {
+        setData(d);
+        setManualScore(d.submission?.manualScore || 0);
+        setLoading(false);
+      })
+      .catch(() => setLoading(false));
   }, [id]);
 
   // Video Playback Animation Timer
@@ -86,12 +105,11 @@ export default function SubmissionDetailPage({ params }: { params: Promise<{ id:
 
   const handleGrade = async () => {
     setSaving(true);
-    await fetch(`/api/submissions/${id}/grade`, {
+    await fetch(getApiUrl(`/submissions/${id}/grade`), {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        manualScore,
-      }),
+      headers: getAuthHeaders(),
+      credentials: "include",
+      body: JSON.stringify({ manualScore }),
     });
     setSaving(false);
     window.location.reload();

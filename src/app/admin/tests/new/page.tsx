@@ -38,7 +38,9 @@ export default function NewTestPage() {
   const [disableRightClick, setDisableRightClick] = useState(true);
 
   useEffect(() => {
-    fetch("/api/questions").then((r) => r.json()).then((d) => setQuestions(d.questions || []));
+    import("@/lib/apiFetch").then(({ apiFetch }) => {
+      apiFetch("/questions").then((r) => r.json()).then((d) => setQuestions(d.questions || []));
+    });
   }, []);
 
   const toggleQuestion = (id: number) => {
@@ -49,9 +51,9 @@ export default function NewTestPage() {
 
   const handleSave = async (publish: boolean) => {
     setSaving(true);
-    const res = await fetch("/api/tests", {
+    const { apiFetch } = await import("@/lib/apiFetch");
+    const res = await apiFetch("/tests", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         title,
         description,
@@ -70,7 +72,7 @@ export default function NewTestPage() {
     const data = await res.json();
 
     if (publish && data.test?.id) {
-      await fetch(`/api/tests/${data.test.id}/publish`, { method: "POST" });
+      await apiFetch(`/tests/${data.test.id}/publish`, { method: "POST" });
     }
 
     setSaving(false);

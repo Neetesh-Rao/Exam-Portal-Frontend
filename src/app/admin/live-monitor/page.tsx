@@ -25,7 +25,8 @@ export default function LiveMonitorPage() {
   const openStreamModal = async (session: any) => {
     setActiveStreamSession(session);
     try {
-      const res = await fetch(`/api/submissions/${session.id}`);
+      const { apiFetch } = await import("@/lib/apiFetch");
+      const res = await apiFetch(`/submissions/${session.id}`);
       const data = await res.json();
       setStreamSnapshots(data.submission?.recordingSnapshots || []);
     } catch (e) {

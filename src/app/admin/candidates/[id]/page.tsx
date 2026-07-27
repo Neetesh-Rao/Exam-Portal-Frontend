@@ -27,7 +27,12 @@ export default function CandidateDetailPage({ params }: { params: Promise<{ id: 
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch(`/api/candidates/${id}`).then((r) => r.json()).then((d) => { setData(d); setLoading(false); });
+    import("@/lib/apiFetch").then(({ apiFetch }) => {
+      apiFetch(`/candidates/${id}`)
+        .then((r) => r.json())
+        .then((d) => { setData(d); setLoading(false); })
+        .catch(() => setLoading(false));
+    });
   }, [id]);
 
   if (loading) return (
