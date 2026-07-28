@@ -68,6 +68,7 @@ export default function QuestionsPage() {
   const [editTarget, setEditTarget] = useState<any | null>(null);
   const [editForm, setEditForm] = useState({
     category: "General",
+    customCategory: "",
     title: "",
     description: "",
     type: "mcq_single",
@@ -97,6 +98,15 @@ export default function QuestionsPage() {
   const [removeQuestion, { isLoading: deleting }] = useDeleteQuestionMutation();
 
   const questions: any[] = data?.questions || [];
+
+  // Extract all categories dynamically (preset + created custom categories in DB)
+  const availableCategories = Array.from(
+    new Set([
+      ...PRESET_CATEGORIES,
+      ...(data?.categories || []),
+      ...questions.map((q) => q.category).filter(Boolean),
+    ])
+  ).filter(Boolean);
 
   // Extract categories that actually exist in the database for pill filters
   const activeCategories = Array.from(
@@ -176,9 +186,13 @@ export default function QuestionsPage() {
 
   const handleOpenEdit = (q: any) => {
     const qid = q.id || q._id;
+    const cat = q.category || "General";
+    const isKnownCat = availableCategories.includes(cat);
+
     setEditTarget({ id: qid, ...q });
     setEditForm({
-      category: q.category || "General",
+      category: isKnownCat ? cat : "Custom",
+      customCategory: isKnownCat ? "" : cat,
       title: q.title || "",
       description: q.description || "",
       type: q.type || "mcq_single",
@@ -202,8 +216,10 @@ export default function QuestionsPage() {
   const handleUpdate = async () => {
     if (!editTarget) return;
 
+    const finalCategory = editForm.category === "Custom" ? editForm.customCategory || "General" : editForm.category;
+
     const payload: Record<string, unknown> = {
-      category: editForm.category,
+      category: finalCategory,
       title: editForm.title,
       description: editForm.description,
       type: editForm.type,
@@ -290,7 +306,7 @@ export default function QuestionsPage() {
                 onChange={(e) => setCategoryFilter(e.target.value)}
                 options={[
                   { value: "All", label: `All Categories (${questions.length})` },
-                  ...PRESET_CATEGORIES.map((c) => ({ value: c, label: c })),
+                  ...availableCategories.map((c) => ({ value: c, label: c })),
                 ]}
               />
 
@@ -478,7 +494,7 @@ export default function QuestionsPage() {
             value={form.category}
             onChange={(e) => setForm({ ...form, category: e.target.value })}
             options={[
-              ...PRESET_CATEGORIES.map((c) => ({ value: c, label: c })),
+              ...availableCategories.map((c) => ({ value: c, label: c })),
               { value: "Custom", label: "+ Add Custom Category..." },
             ]}
           />
@@ -618,8 +634,20 @@ export default function QuestionsPage() {
             label="Question Category"
             value={editForm.category}
             onChange={(e) => setEditForm({ ...editForm, category: e.target.value })}
-            options={PRESET_CATEGORIES.map((c) => ({ value: c, label: c }))}
+            options={[
+              ...availableCategories.map((c) => ({ value: c, label: c })),
+              { value: "Custom", label: "+ Add Custom Category..." },
+            ]}
           />
+
+          {editForm.category === "Custom" && (
+            <Input
+              label="New Custom Category Name"
+              placeholder="e.g. Next.js, CyberSecurity, DevOps..."
+              value={editForm.customCategory}
+              onChange={(e) => setEditForm({ ...editForm, customCategory: e.target.value })}
+            />
+          )}
           <Input
             label="Question Title *"
             value={editForm.title}
