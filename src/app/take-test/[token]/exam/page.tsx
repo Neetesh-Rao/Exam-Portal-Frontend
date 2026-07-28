@@ -214,7 +214,13 @@ export default function ExamPage({ params }: { params: Promise<{ token: string }
         }
 
         if (window.MediaRecorder && webcamStream) {
-          const webcamRecorder = new MediaRecorder(webcamStream);
+          const options = MediaRecorder.isTypeSupported("video/webm;codecs=vp8,opus")
+            ? { mimeType: "video/webm;codecs=vp8,opus" }
+            : MediaRecorder.isTypeSupported("video/webm")
+            ? { mimeType: "video/webm" }
+            : undefined;
+
+          const webcamRecorder = options ? new MediaRecorder(webcamStream, options) : new MediaRecorder(webcamStream);
           webcamRecorderRef.current = webcamRecorder;
           webcamRecorder.ondataavailable = (event: BlobEvent) => {
             if (event.data && event.data.size > 0) {
@@ -235,7 +241,13 @@ export default function ExamPage({ params }: { params: Promise<{ token: string }
         }
 
         if (window.MediaRecorder && screenStream) {
-          const screenRecorder = new MediaRecorder(screenStream);
+          const options = MediaRecorder.isTypeSupported("video/webm;codecs=vp8,opus")
+            ? { mimeType: "video/webm;codecs=vp8,opus" }
+            : MediaRecorder.isTypeSupported("video/webm")
+            ? { mimeType: "video/webm" }
+            : undefined;
+
+          const screenRecorder = options ? new MediaRecorder(screenStream, options) : new MediaRecorder(screenStream);
           screenRecorderRef.current = screenRecorder;
           screenRecorder.ondataavailable = (event: BlobEvent) => {
             if (event.data && event.data.size > 0) {
@@ -383,8 +395,7 @@ export default function ExamPage({ params }: { params: Promise<{ token: string }
         formData.append("screenVideo", screenBlob, "screen_recording.webm");
       }
 
-      const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
-      const res = await fetch(`${apiBase}/api/submissions/${activeSubId}/upload-full-recordings`, {
+      const res = await fetch(`/api/submissions/${activeSubId}/upload-full-recordings`, {
         method: "POST",
         body: formData,
       });
