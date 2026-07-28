@@ -17,7 +17,7 @@ export default function CandidateLayout({ children }: { children: React.ReactNod
             <button
               onClick={async () => {
                 await fetch("/api/auth/logout", { method: "POST" });
-                window.location.href = "/login";
+                window.location.href = "/";
               }}
               className="text-sm text-[var(--text-muted)] hover:text-danger cursor-pointer"
             >

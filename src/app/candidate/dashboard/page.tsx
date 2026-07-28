@@ -24,7 +24,7 @@ export default function CandidateDashboardPage() {
     } catch {
       // ignore
     }
-    router.push("/login");
+    window.location.href = "/";
   };
 
   const getStatusBadge = (status: string) => {

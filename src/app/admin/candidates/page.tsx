@@ -271,165 +271,166 @@ export default function CandidatesPage() {
           </Card>
         ) : (
           <Card className="overflow-hidden !p-0">
-            <table className="w-full">
-              <thead>
-                <tr style={{ borderBottom: "1px solid var(--border-color)" }}>
-                  {["Name", "Email", "Phone", "Resume", "Source", "Status", "Actions"].map((h, i) => (
-                    <th
-                      key={h}
-                      className="py-3 text-xs font-semibold uppercase tracking-wider"
-                      style={{
-                        textAlign: i === 6 ? "right" : "left",
-                        paddingLeft: "1.5rem",
-                        paddingRight: "1.5rem",
-                        color: "var(--text-muted)",
-                      }}
-                    >
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((c: any) => {
-                  const candidateId = c.id || c._id?.toString();
-                  const isNew = newCandidateIds.has(candidateId);
-                  return (
-                    <tr
-                      key={candidateId}
-                      className={isNew ? "crm-new-row" : ""}
-                      style={{ borderBottom: "1px solid var(--border-color)", transition: "background .15s" }}
-                      onMouseEnter={(e) => { (e.currentTarget as HTMLTableRowElement).style.background = "var(--surface2-color)"; }}
-                      onMouseLeave={(e) => { if (!isNew) (e.currentTarget as HTMLTableRowElement).style.background = ""; }}
-                    >
-                      {/* Name */}
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-3">
-                          <div
-                            className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold"
-                            style={{ backgroundColor: "var(--surface2-color)", color: "var(--text-secondary)" }}
-                          >
-                            {c.name ? c.name.charAt(0).toUpperCase() : "C"}
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[960px]">
+                <thead>
+                  <tr style={{ borderBottom: "1px solid var(--border-color)" }}>
+                    {["Name", "Email", "Phone", "Resume", "Source", "Status", "Actions"].map((h, i) => (
+                      <th
+                        key={h}
+                        className="py-3 px-4 text-xs font-semibold uppercase tracking-wider"
+                        style={{
+                          textAlign: i === 6 ? "right" : "left",
+                          color: "var(--text-muted)",
+                          minWidth: i === 6 ? "150px" : undefined,
+                        }}
+                      >
+                        {h}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtered.map((c: any) => {
+                    const candidateId = c.id || c._id?.toString();
+                    const isNew = newCandidateIds.has(candidateId);
+                    return (
+                      <tr
+                        key={candidateId}
+                        className={isNew ? "crm-new-row" : ""}
+                        style={{ borderBottom: "1px solid var(--border-color)", transition: "background .15s" }}
+                        onMouseEnter={(e) => { (e.currentTarget as HTMLTableRowElement).style.background = "var(--surface2-color)"; }}
+                        onMouseLeave={(e) => { if (!isNew) (e.currentTarget as HTMLTableRowElement).style.background = ""; }}
+                      >
+                        {/* Name */}
+                        <td className="px-4 py-3.5">
+                          <div className="flex items-center gap-2.5">
+                            <div
+                              className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0"
+                              style={{ backgroundColor: "var(--surface2-color)", color: "var(--text-secondary)" }}
+                            >
+                              {c.name ? c.name.charAt(0).toUpperCase() : "C"}
+                            </div>
+                            <div className="flex flex-col min-w-0">
+                              <span className="text-sm font-medium truncate" style={{ color: "var(--text-primary)" }}>{c.name}</span>
+                              {isNew && (
+                                <span style={{ fontSize: "10px", color: "#0ea5e9", fontWeight: 600 }}>✦ Just added via CRM</span>
+                              )}
+                            </div>
                           </div>
-                          <div className="flex flex-col">
-                            <span className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>{c.name}</span>
-                            {isNew && (
-                              <span style={{ fontSize: "10px", color: "#0ea5e9", fontWeight: 600 }}>✦ Just added via CRM</span>
-                            )}
-                          </div>
-                        </div>
-                      </td>
-                      {/* Email */}
-                      <td className="px-6 py-4 text-sm" style={{ color: "var(--text-secondary)" }}>{c.email}</td>
-                      {/* Phone */}
-                      <td className="px-6 py-4 text-sm" style={{ color: "var(--text-secondary)" }}>{c.phone || "—"}</td>
-                      {/* Resume Column (Download Link / View) */}
-                      <td className="px-6 py-4 text-sm">
-                        {c.resumeUrl ? (
-                          <a
-                            href={c.resumeUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold transition-colors border"
-                            style={{
-                              color: "#0284c7",
-                              backgroundColor: "#eff6ff",
-                              borderColor: "#bfdbfe",
-                            }}
-                            title="View / Download Resume"
-                          >
-                            <FileTextIcon /> Resume
-                          </a>
-                        ) : (
-                          <span style={{ color: "var(--text-muted)" }}>—</span>
-                        )}
-                      </td>
-                      {/* Source */}
-                      <td className="px-6 py-4">{c.source ? <Badge variant="neutral">{c.source}</Badge> : "—"}</td>
-                      {/* Status */}
-                      <td className="px-6 py-4">{getStatusBadge(c.status)}</td>
-                      {/* Actions Column: Invite, View, Edit, Delete */}
-                      <td className="px-6 py-4">
-                        <div className="flex items-center justify-end gap-1">
-                          {/* Direct Invite Icon */}
-                          <button
-                            type="button"
-                            title="Send Test Invitation Email"
-                            onClick={() => handleOpenInvite(c)}
-                            className="w-8 h-8 rounded-lg flex items-center justify-center transition-colors cursor-pointer"
-                            style={{ color: "#0284c7", background: "transparent" }}
-                            onMouseEnter={(e) => {
-                              (e.currentTarget as HTMLButtonElement).style.backgroundColor = "#eff6ff";
-                            }}
-                            onMouseLeave={(e) => {
-                              (e.currentTarget as HTMLButtonElement).style.backgroundColor = "transparent";
-                            }}
-                          >
-                            <SendIcon />
-                          </button>
-
-                          {/* View Icon */}
-                          <a href={`/admin/candidates/${candidateId}`}>
+                        </td>
+                        {/* Email */}
+                        <td className="px-4 py-3.5 text-sm" style={{ color: "var(--text-secondary)" }}>{c.email}</td>
+                        {/* Phone */}
+                        <td className="px-4 py-3.5 text-sm whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>{c.phone || "—"}</td>
+                        {/* Resume Column (Download Link / View) */}
+                        <td className="px-4 py-3.5 text-sm">
+                          {c.resumeUrl ? (
+                            <a
+                              href={c.resumeUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold transition-colors border"
+                              style={{
+                                color: "#0284c7",
+                                backgroundColor: "#eff6ff",
+                                borderColor: "#bfdbfe",
+                              }}
+                              title="View / Download Resume"
+                            >
+                              <FileTextIcon /> Resume
+                            </a>
+                          ) : (
+                            <span style={{ color: "var(--text-muted)" }}>—</span>
+                          )}
+                        </td>
+                        {/* Source */}
+                        <td className="px-4 py-3.5">{c.source ? <Badge variant="neutral">{c.source}</Badge> : "—"}</td>
+                        {/* Status */}
+                        <td className="px-4 py-3.5">{getStatusBadge(c.status)}</td>
+                        {/* Actions Column: Invite, View, Edit, Delete (Guaranteed Visible) */}
+                        <td className="px-4 py-3.5">
+                          <div className="flex items-center justify-end gap-1 min-w-[140px]">
+                            {/* Direct Invite Icon */}
                             <button
                               type="button"
-                              title="View Candidate Details"
-                              className="w-8 h-8 rounded-lg flex items-center justify-center transition-colors cursor-pointer"
+                              title="Send Test Invitation Email"
+                              onClick={() => handleOpenInvite(c)}
+                              className="w-8 h-8 rounded-lg flex items-center justify-center transition-colors cursor-pointer flex-shrink-0"
+                              style={{ color: "#0284c7", background: "transparent" }}
+                              onMouseEnter={(e) => {
+                                (e.currentTarget as HTMLButtonElement).style.backgroundColor = "#eff6ff";
+                              }}
+                              onMouseLeave={(e) => {
+                                (e.currentTarget as HTMLButtonElement).style.backgroundColor = "transparent";
+                              }}
+                            >
+                              <SendIcon />
+                            </button>
+
+                            {/* View Icon */}
+                            <a href={`/admin/candidates/${candidateId}`}>
+                              <button
+                                type="button"
+                                title="View Candidate Details"
+                                className="w-8 h-8 rounded-lg flex items-center justify-center transition-colors cursor-pointer flex-shrink-0"
+                                style={{ color: "var(--text-secondary)", background: "transparent" }}
+                                onMouseEnter={(e) => {
+                                  (e.currentTarget as HTMLButtonElement).style.backgroundColor = "var(--badge-accent-bg)";
+                                  (e.currentTarget as HTMLButtonElement).style.color = "#0284c7";
+                                }}
+                                onMouseLeave={(e) => {
+                                  (e.currentTarget as HTMLButtonElement).style.backgroundColor = "transparent";
+                                  (e.currentTarget as HTMLButtonElement).style.color = "var(--text-secondary)";
+                                }}
+                              >
+                                <EyeIcon />
+                              </button>
+                            </a>
+
+                            {/* Edit Icon */}
+                            <button
+                              type="button"
+                              title="Edit Candidate"
+                              onClick={() => handleOpenEdit(c)}
+                              className="w-8 h-8 rounded-lg flex items-center justify-center transition-colors cursor-pointer flex-shrink-0"
                               style={{ color: "var(--text-secondary)", background: "transparent" }}
                               onMouseEnter={(e) => {
-                                (e.currentTarget as HTMLButtonElement).style.backgroundColor = "var(--badge-accent-bg)";
-                                (e.currentTarget as HTMLButtonElement).style.color = "#0284c7";
+                                (e.currentTarget as HTMLButtonElement).style.backgroundColor = "var(--surface2-color)";
+                                (e.currentTarget as HTMLButtonElement).style.color = "var(--text-primary)";
                               }}
                               onMouseLeave={(e) => {
                                 (e.currentTarget as HTMLButtonElement).style.backgroundColor = "transparent";
                                 (e.currentTarget as HTMLButtonElement).style.color = "var(--text-secondary)";
                               }}
                             >
-                              <EyeIcon />
+                              <EditIcon />
                             </button>
-                          </a>
 
-                          {/* Edit Icon */}
-                          <button
-                            type="button"
-                            title="Edit Candidate"
-                            onClick={() => handleOpenEdit(c)}
-                            className="w-8 h-8 rounded-lg flex items-center justify-center transition-colors cursor-pointer"
-                            style={{ color: "var(--text-secondary)", background: "transparent" }}
-                            onMouseEnter={(e) => {
-                              (e.currentTarget as HTMLButtonElement).style.backgroundColor = "var(--surface2-color)";
-                              (e.currentTarget as HTMLButtonElement).style.color = "var(--text-primary)";
-                            }}
-                            onMouseLeave={(e) => {
-                              (e.currentTarget as HTMLButtonElement).style.backgroundColor = "transparent";
-                              (e.currentTarget as HTMLButtonElement).style.color = "var(--text-secondary)";
-                            }}
-                          >
-                            <EditIcon />
-                          </button>
-
-                          {/* Delete Icon */}
-                          <button
-                            type="button"
-                            title="Delete Candidate"
-                            onClick={() => setDeleteTarget({ id: candidateId, name: c.name })}
-                            className="w-8 h-8 rounded-lg flex items-center justify-center transition-colors cursor-pointer"
-                            style={{ color: "#dc2626", background: "transparent" }}
-                            onMouseEnter={(e) => {
-                              (e.currentTarget as HTMLButtonElement).style.backgroundColor = "#fef2f2";
-                            }}
-                            onMouseLeave={(e) => {
-                              (e.currentTarget as HTMLButtonElement).style.backgroundColor = "transparent";
-                            }}
-                          >
-                            <TrashIcon />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                            {/* Delete Icon (Trash) — High Contrast & Clear */}
+                            <button
+                              type="button"
+                              title="Delete Candidate"
+                              onClick={() => setDeleteTarget({ id: candidateId, name: c.name })}
+                              className="w-8 h-8 rounded-lg flex items-center justify-center transition-colors cursor-pointer flex-shrink-0"
+                              style={{ color: "#dc2626", background: "transparent" }}
+                              onMouseEnter={(e) => {
+                                (e.currentTarget as HTMLButtonElement).style.backgroundColor = "#fef2f2";
+                              }}
+                              onMouseLeave={(e) => {
+                                (e.currentTarget as HTMLButtonElement).style.backgroundColor = "transparent";
+                              }}
+                            >
+                              <TrashIcon />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </Card>
         )}
 
