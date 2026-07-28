@@ -22,6 +22,7 @@ import {
   X,
   Code,
   HelpCircle,
+  Play,
 } from "lucide-react";
 
 interface QuestionOption {
@@ -77,6 +78,20 @@ interface SubmissionData {
   violations: { id: string; type: string; createdAt: string }[];
 }
 
+interface RecordingItem {
+  id: string;
+  isCamera: boolean;
+  url: string;
+  timestamp: string;
+  label: string;
+}
+
+interface RecordingSessionGroup {
+  id: string;
+  timestamp: string;
+  items: RecordingItem[];
+}
+
 export default function SubmissionDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const [data, setData] = useState<SubmissionData | null>(null);
@@ -85,7 +100,7 @@ export default function SubmissionDetailPage({ params }: { params: Promise<{ id:
   const [saving, setSaving] = useState(false);
   const [activeSnapshotIdx, setActiveSnapshotIdx] = useState<number>(0);
   const [isPlayingVideo, setIsPlayingVideo] = useState<boolean>(false);
-  const [selectedRecordStream, setSelectedRecordStream] = useState<string | null>(null);
+  const [selectedSessionIdx, setSelectedSessionIdx] = useState<number>(0);
 
   const getApiUrl = (path: string) => {
     const base = process.env.NEXT_PUBLIC_API_URL || "";
@@ -170,41 +185,62 @@ export default function SubmissionDetailPage({ params }: { params: Promise<{ id:
   const history = submission?.recordingsHistory || [];
   const currentSnapshot = snapshots[activeSnapshotIdx];
 
-  const cameraUrl = selectedRecordStream || submission?.videoRecordingUrl || undefined;
-  const screenUrl = submission?.screenRecordingUrl || undefined;
-
-  // Build list of all historical recording sessions with date/time (deduplicated by URL)
-  const rawRecordings = [
+  // ── Construct Unique Deduplicated List of Stream Recordings ───────────────────────
+  const rawRecordings: RecordingItem[] = [
     ...(submission?.videoRecordingUrl ? [{
       id: "cam_main",
-      type: "Camera Video",
+      isCamera: true,
       url: submission.videoRecordingUrl,
       timestamp: submission.submittedAt || submission.createdAt || new Date().toISOString(),
       label: "Camera Video Stream",
     }] : []),
     ...(submission?.screenRecordingUrl ? [{
       id: "screen_main",
-      type: "Screen Capture",
+      isCamera: false,
       url: submission.screenRecordingUrl,
       timestamp: submission.submittedAt || submission.createdAt || new Date().toISOString(),
       label: "Screen Activity Video",
     }] : []),
     ...history.map((h, i) => ({
       id: `hist_${i}`,
-      type: h.type === "camera" ? "Camera Stream" : h.type === "screen" ? "Screen Stream" : "Snapshot Frame",
+      isCamera: h.type === "camera",
       url: h.url,
-      timestamp: h.timestamp || submission.createdAt,
-      label: h.event || `Recording Stream #${i + 1}`,
+      timestamp: h.timestamp || submission.createdAt || new Date().toISOString(),
+      label: h.event || (h.type === "camera" ? "Webcam Recording Stream" : "Screen Recording Stream"),
     })),
   ];
 
-  // Deduplicate by URL
+  // Unique deduplication by URL
   const seenUrls = new Set<string>();
-  const allRecordings = rawRecordings.filter((rec) => {
+  const deduplicatedRecordings = rawRecordings.filter((rec) => {
     if (!rec.url || seenUrls.has(rec.url)) return false;
     seenUrls.add(rec.url);
     return true;
   });
+
+  // ── Group Recordings by Session Timestamp (Bucket by Minute) ───────
+  const groupedSessionsMap = new Map<string, RecordingItem[]>();
+
+  for (const item of deduplicatedRecordings) {
+    const d = new Date(item.timestamp);
+    const timeKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+    
+    if (!groupedSessionsMap.has(timeKey)) {
+      groupedSessionsMap.set(timeKey, []);
+    }
+    groupedSessionsMap.get(timeKey)!.push(item);
+  }
+
+  const groupedSessions: RecordingSessionGroup[] = Array.from(groupedSessionsMap.entries()).map(([ts, items], i) => ({
+    id: `session_${i}`,
+    timestamp: items[0]?.timestamp || ts,
+    items,
+  })).sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+
+  // Derive Active Camera & Screen Video URLs based on 1-Click Selected Session Group
+  const activeSession = groupedSessions[selectedSessionIdx] || groupedSessions[0];
+  const cameraUrl = activeSession?.items.find((i) => i.isCamera)?.url || submission?.videoRecordingUrl || undefined;
+  const screenUrl = activeSession?.items.find((i) => !i.isCamera)?.url || submission?.screenRecordingUrl || undefined;
 
   return (
     <div>
@@ -241,51 +277,107 @@ export default function SubmissionDetailPage({ params }: { params: Promise<{ id:
           </div>
         </Card>
 
-        {/* All Archived Test Recordings Timeline Selector */}
-        {allRecordings.length > 0 && (
+        {/* ── 1-Click Dual Player Session Attempt Recordings Selector ────────────────────────── */}
+        {groupedSessions.length > 0 && (
           <Card className="space-y-4">
             <div className="flex items-center justify-between border-b pb-3" style={{ borderColor: "var(--border-color)" }}>
-              <h3 className="text-sm font-bold flex items-center gap-2" style={{ color: "var(--text-primary)" }}>
-                <Film className="w-4 h-4 text-sky-500" />
-                All Test Recordings & Stream Archive ({allRecordings.length} Streams Recorded)
-              </h3>
-              <span className="text-xs font-semibold" style={{ color: "var(--text-muted)" }}>
-                Date & Time Indexed
+              <div>
+                <h3 className="text-base font-bold flex items-center gap-2" style={{ color: "var(--text-primary)" }}>
+                  <Film className="w-5 h-5 text-sky-500" />
+                  Select Test Session Attempt ({groupedSessions.length} Date Sessions Recorded)
+                </h3>
+                <p className="text-xs mt-0.5" style={{ color: "var(--text-muted)" }}>
+                  Click any Session Attempt card below to load BOTH Camera Video & Screen Activity Video into players simultaneously!
+                </p>
+              </div>
+              <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-sky-500/10 text-sky-600 border border-sky-500/20">
+                1-Click Dual Video Load
               </span>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-              {allRecordings.map((rec) => (
-                <button
-                  key={rec.id}
-                  onClick={() => setSelectedRecordStream(rec.url)}
-                  className="p-3 rounded-xl border text-left transition-all cursor-pointer flex items-start gap-3 hover:shadow-sm"
-                  style={{
-                    backgroundColor: selectedRecordStream === rec.url ? "var(--surface2-color)" : "var(--surface-color)",
-                    borderColor: selectedRecordStream === rec.url ? "#0284c7" : "var(--border-color)",
-                    boxShadow: selectedRecordStream === rec.url ? "0 0 0 1px #0284c7" : "none",
-                  }}
-                >
-                  <div className="w-8 h-8 rounded-lg bg-sky-500/10 text-sky-600 flex items-center justify-center flex-shrink-0 mt-0.5">
-                    <Video className="w-4 h-4" />
+            <div className="space-y-4">
+              {groupedSessions.map((session, sIdx) => {
+                const isSelectedSession = selectedSessionIdx === sIdx;
+
+                return (
+                  <div
+                    key={session.id}
+                    onClick={() => setSelectedSessionIdx(sIdx)}
+                    className="p-4 rounded-2xl border transition-all cursor-pointer hover:shadow-md space-y-3"
+                    style={{
+                      backgroundColor: isSelectedSession ? "var(--surface2-color)" : "var(--surface-color)",
+                      borderColor: isSelectedSession ? "#0284c7" : "var(--border-color)",
+                      boxShadow: isSelectedSession ? "0 0 0 2px #0284c7" : "none",
+                    }}
+                  >
+                    {/* Session Header */}
+                    <div className="flex items-center justify-between flex-wrap gap-2">
+                      <div className="flex items-center gap-2">
+                        {sIdx === 0 ? (
+                          <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 flex items-center gap-1.5">
+                            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                            Current / Latest Test Session
+                          </span>
+                        ) : (
+                          <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-500/10 text-amber-600 border border-amber-500/20 flex items-center gap-1">
+                            <Clock className="w-3 h-3" />
+                            Previous Attempt #{groupedSessions.length - sIdx}
+                          </span>
+                        )}
+                        <span className="text-xs font-mono font-semibold flex items-center gap-1" style={{ color: "var(--text-primary)" }}>
+                          <Calendar className="w-3.5 h-3.5 text-sky-500" />
+                          {new Date(session.timestamp).toLocaleString([], { dateStyle: "full", timeStyle: "medium" })}
+                        </span>
+                      </div>
+
+                      {isSelectedSession ? (
+                        <span className="px-3 py-1 rounded-full text-xs font-bold bg-sky-600 text-white flex items-center gap-1 shadow-sm">
+                          <Play className="w-3 h-3 fill-current" /> Active Session Loaded
+                        </span>
+                      ) : (
+                        <span className="text-xs text-sky-600 font-semibold hover:underline">
+                          Click to Load Both Videos →
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Session Streams Preview Grid */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {session.items.map((rec) => (
+                        <div
+                          key={rec.id}
+                          className="p-3 rounded-xl border flex items-center gap-3"
+                          style={{
+                            backgroundColor: "var(--surface-color)",
+                            borderColor: "var(--border-color)",
+                          }}
+                        >
+                          <div
+                            className={`w-8 h-8 rounded-lg flex items-center justify-center text-white text-sm font-bold ${
+                              rec.isCamera ? "bg-emerald-600" : "bg-sky-600"
+                            }`}
+                          >
+                            {rec.isCamera ? "📹" : "🖥️"}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-xs font-bold truncate" style={{ color: "var(--text-primary)" }}>
+                              {rec.isCamera ? "Camera & Audio Video Stream" : "Screen Activity Video Stream"}
+                            </p>
+                            <p className="text-[11px] truncate" style={{ color: "var(--text-muted)" }}>
+                              Recorded at: {new Date(rec.timestamp).toLocaleTimeString()}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-xs font-bold truncate" style={{ color: "var(--text-primary)" }}>{rec.label}</p>
-                    <p className="text-[11px] flex items-center gap-1 mt-0.5" style={{ color: "var(--text-muted)" }}>
-                      <Calendar className="w-3 h-3 text-sky-500" />
-                      {new Date(rec.timestamp).toLocaleString()}
-                    </p>
-                    <span className="inline-block mt-1.5 text-[10px] font-semibold px-2 py-0.5 rounded bg-sky-500/10 text-sky-600 border border-sky-500/20">
-                      {rec.type}
-                    </span>
-                  </div>
-                </button>
-              ))}
+                );
+              })}
             </div>
           </Card>
         )}
 
-        {/* Video Recordings Section (Camera & Screen Recording) */}
+        {/* Video Recordings Section (Camera & Screen Recording Players) */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Camera Video Player */}
           <Card className="space-y-3">
@@ -302,7 +394,7 @@ export default function SubmissionDetailPage({ params }: { params: Promise<{ id:
               ) : (
                 <div className="text-center p-6 text-neutral-400 text-xs">
                   <Video className="w-8 h-8 mx-auto mb-2 opacity-40 text-emerald-400" />
-                  <p>No camera video stream recorded for this submission.</p>
+                  <p>No camera video stream recorded for this session attempt.</p>
                 </div>
               )}
             </div>
@@ -323,7 +415,7 @@ export default function SubmissionDetailPage({ params }: { params: Promise<{ id:
               ) : (
                 <div className="text-center p-6 text-neutral-400 text-xs">
                   <Video className="w-8 h-8 mx-auto mb-2 opacity-40 text-blue-400" />
-                  <p>No screen recording stream uploaded for this submission.</p>
+                  <p>No screen recording stream uploaded for this session attempt.</p>
                 </div>
               )}
             </div>
