@@ -43,8 +43,22 @@ function TrashIcon() {
   );
 }
 
+const PRESET_CATEGORIES = [
+  "React",
+  "Node.js",
+  "Aptitude",
+  "Python",
+  "JavaScript",
+  "Core CS & Fundamentals",
+  "Data Structures",
+  "DBMS",
+  "General Reasoning",
+  "General",
+];
+
 export default function QuestionsPage() {
   const [search, setSearch] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("All");
   const [typeFilter, setTypeFilter] = useState("");
   const [diffFilter, setDiffFilter] = useState("");
   const [showCreate, setShowCreate] = useState(false);
@@ -53,6 +67,7 @@ export default function QuestionsPage() {
   // Detailed Edit State
   const [editTarget, setEditTarget] = useState<any | null>(null);
   const [editForm, setEditForm] = useState({
+    category: "General",
     title: "",
     description: "",
     type: "mcq_single",
@@ -83,7 +98,13 @@ export default function QuestionsPage() {
 
   const questions: any[] = data?.questions || [];
 
+  // Extract categories that actually exist in the database for pill filters
+  const activeCategories = Array.from(
+    new Set(questions.map((q) => q.category || "General").filter(Boolean))
+  );
+
   const filtered = questions.filter((q) => {
+    if (categoryFilter !== "All" && (q.category || "General") !== categoryFilter) return false;
     if (typeFilter && q.type !== typeFilter) return false;
     if (diffFilter && q.difficulty !== diffFilter) return false;
     return true;
@@ -91,6 +112,8 @@ export default function QuestionsPage() {
 
   // Create Form State
   const [form, setForm] = useState({
+    category: "React",
+    customCategory: "",
     title: "",
     description: "",
     type: "mcq_single",
@@ -111,7 +134,9 @@ export default function QuestionsPage() {
   });
 
   const handleCreate = async () => {
+    const finalCategory = form.category === "Custom" ? form.customCategory || "General" : form.category;
     const payload: Record<string, unknown> = {
+      category: finalCategory,
       title: form.title,
       description: form.description,
       type: form.type,
@@ -135,7 +160,7 @@ export default function QuestionsPage() {
       await addQuestion(payload).unwrap();
       setShowCreate(false);
       setForm({
-        title: "", description: "", type: "mcq_single", difficulty: "medium", marks: 1, negativeMarks: 0,
+        category: "React", customCategory: "", title: "", description: "", type: "mcq_single", difficulty: "medium", marks: 1, negativeMarks: 0,
         tags: "", correctTextAnswer: "", options: [
           { id: "a", text: "", isCorrect: true },
           { id: "b", text: "", isCorrect: false },
@@ -153,6 +178,7 @@ export default function QuestionsPage() {
     const qid = q.id || q._id;
     setEditTarget({ id: qid, ...q });
     setEditForm({
+      category: q.category || "General",
       title: q.title || "",
       description: q.description || "",
       type: q.type || "mcq_single",
@@ -177,6 +203,7 @@ export default function QuestionsPage() {
     if (!editTarget) return;
 
     const payload: Record<string, unknown> = {
+      category: editForm.category,
       title: editForm.title,
       description: editForm.description,
       type: editForm.type,
@@ -193,546 +220,454 @@ export default function QuestionsPage() {
       payload.correctTextAnswer = editForm.correctTextAnswer;
     }
     if (editForm.type === "coding") {
-      payload.codeConfig = {
-        language: editForm.codeLanguage,
-        starterCode: editForm.starterCode,
-        disablePaste: editForm.disablePaste,
-      };
+      payload.codeConfig = { language: editForm.codeLanguage, starterCode: editForm.starterCode, disablePaste: editForm.disablePaste };
     }
 
     try {
-      await updateQuestion({
-        id: editTarget.id,
-        ...payload,
-      }).unwrap();
+      await updateQuestion({ id: editTarget.id, ...payload }).unwrap();
       setEditTarget(null);
     } catch (err) {
       console.error("Update question error:", err);
     }
   };
 
-  const handleDeleteConfirm = async () => {
+  const handleDeleteConfirmed = async () => {
     if (!deleteTarget) return;
     setDeleteErr("");
+    const targetId = deleteTarget.id || deleteTarget._id;
     try {
-      const qid = deleteTarget.id || deleteTarget._id;
-      await removeQuestion(qid).unwrap();
+      await removeQuestion(targetId).unwrap();
       setDeleteTarget(null);
     } catch (err: any) {
-      console.error("Delete question error:", err);
-      setDeleteErr(err?.data?.error || "Failed to delete question. Please try again.");
+      setDeleteErr(err?.data?.error || err?.message || "Failed to delete question.");
     }
   };
 
   const diffBadge = (d: string) => {
-    const map: Record<string, "success" | "warning" | "danger"> = { easy: "success", medium: "warning", hard: "danger" };
-    return <Badge variant={map[d] || "neutral"}>{d}</Badge>;
+    if (d === "easy") {
+      return (
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-600 border border-emerald-500/20">
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Easy
+        </span>
+      );
+    }
+    if (d === "hard") {
+      return (
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold bg-rose-500/10 text-rose-600 border border-rose-500/20">
+          <span className="w-1.5 h-1.5 rounded-full bg-rose-500"></span> Hard
+        </span>
+      );
+    }
+    return (
+      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-500/10 text-amber-600 border border-amber-500/20">
+        <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span> Medium
+      </span>
+    );
   };
-
-  const typeLabel = (t: string) => (t ? t.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()) : "N/A");
 
   return (
     <div>
-      <AdminHeader title="Question Bank" subtitle="Manage your assessment questions" />
-      <div className="p-8 max-w-7xl mx-auto">
-        <div className="flex items-center justify-between gap-4 mb-6 flex-wrap">
-          <div className="flex items-center gap-3 flex-wrap">
-            <Input placeholder="Search questions..." value={search} onChange={(e) => setSearch(e.target.value)} className="max-w-xs" />
+      <AdminHeader
+        title="Question Bank & Series"
+        subtitle="Manage questions categorized by React, Aptitude, Python, Node.js, and CS topics"
+      />
+
+      <div className="p-8 max-w-7xl mx-auto space-y-6">
+        {/* Unified Modern Toolbar & Filter Card */}
+        <Card className="space-y-4">
+          <div className="flex flex-col md:flex-row gap-3 items-stretch md:items-center justify-between">
+            <div className="flex-1 min-w-[240px]">
+              <Input
+                placeholder="Search question title..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </div>
+
+            <div className="flex flex-wrap gap-2.5 items-center">
+              <Select
+                value={categoryFilter}
+                onChange={(e) => setCategoryFilter(e.target.value)}
+                options={[
+                  { value: "All", label: `All Categories (${questions.length})` },
+                  ...PRESET_CATEGORIES.map((c) => ({ value: c, label: c })),
+                ]}
+              />
+
+              <Select
+                value={typeFilter}
+                onChange={(e) => setTypeFilter(e.target.value)}
+                options={[
+                  { value: "", label: "All Question Types" },
+                  { value: "mcq_single", label: "Single Choice MCQ" },
+                  { value: "mcq_multi", label: "Multiple Choice MCQ" },
+                  { value: "coding", label: "Coding Monaco" },
+                  { value: "fill_blank", label: "Fill in Blanks" },
+                  { value: "true_false", label: "True / False" },
+                  { value: "text_area", label: "Text Area" },
+                ]}
+              />
+
+              <Select
+                value={diffFilter}
+                onChange={(e) => setDiffFilter(e.target.value)}
+                options={[
+                  { value: "", label: "All Difficulties" },
+                  { value: "easy", label: "Easy" },
+                  { value: "medium", label: "Medium" },
+                  { value: "hard", label: "Hard" },
+                ]}
+              />
+
+              <Button onClick={() => setShowCreate(true)} className="shadow-sm">
+                + Create Question
+              </Button>
+            </div>
+          </div>
+
+          {/* Active Category Filter Chips Bar */}
+          <div className="flex items-center gap-2 pt-2 border-t flex-wrap" style={{ borderColor: "var(--border-color)" }}>
+            <span className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)] mr-1">
+              Active Topics:
+            </span>
+            <button
+              onClick={() => setCategoryFilter("All")}
+              className={`px-3 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer ${
+                categoryFilter === "All"
+                  ? "bg-sky-600 text-white shadow-sm"
+                  : "bg-[var(--surface2-color)] text-[var(--text-muted)] hover:text-[var(--text-primary)] border"
+              }`}
+              style={{ borderColor: "var(--border-color)" }}
+            >
+              All ({questions.length})
+            </button>
+
+            {activeCategories.map((cat) => {
+              const count = questions.filter((q) => (q.category || "General") === cat).length;
+              const isActive = categoryFilter === cat;
+
+              return (
+                <button
+                  key={cat}
+                  onClick={() => setCategoryFilter(cat)}
+                  className={`px-3 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
+                    isActive
+                      ? "bg-sky-600 text-white shadow-sm"
+                      : "bg-[var(--surface2-color)] text-[var(--text-muted)] hover:text-[var(--text-primary)] border"
+                  }`}
+                  style={{ borderColor: "var(--border-color)" }}
+                >
+                  <span>{cat}</span>
+                  <span className={`px-1.5 py-0.2 rounded text-[10px] ${isActive ? "bg-white/20 text-white" : "bg-sky-500/10 text-sky-600"}`}>
+                    {count}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </Card>
+
+        {/* Clean Theme-Matched Questions Table */}
+        {loading ? (
+          <Card><TableSkeleton rows={5} /></Card>
+        ) : filtered.length === 0 ? (
+          <Card>
+            <EmptyState
+              title="No questions found"
+              description="No questions match your current search or category filter criteria."
+              actionLabel="Create First Question"
+              onAction={() => setShowCreate(true)}
+            />
+          </Card>
+        ) : (
+          <Card className="p-0 overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr
+                    style={{
+                      backgroundColor: "var(--surface2-color)",
+                      borderBottom: "1px solid var(--border-color)",
+                    }}
+                  >
+                    <th className="px-5 py-3.5 text-xs font-bold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>
+                      Question Details
+                    </th>
+                    <th className="px-5 py-3.5 text-xs font-bold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>
+                      Category Series
+                    </th>
+                    <th className="px-5 py-3.5 text-xs font-bold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>
+                      Type
+                    </th>
+                    <th className="px-5 py-3.5 text-xs font-bold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>
+                      Difficulty
+                    </th>
+                    <th className="px-5 py-3.5 text-xs font-bold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>
+                      Marks
+                    </th>
+                    <th className="px-5 py-3.5 text-xs font-bold uppercase tracking-wider text-right" style={{ color: "var(--text-muted)" }}>
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y" style={{ borderColor: "var(--border-color)" }}>
+                  {filtered.map((q) => {
+                    const qid = q.id || q._id;
+                    return (
+                      <tr
+                        key={qid}
+                        className="transition-colors"
+                        style={{ borderBottom: "1px solid var(--border-color)" }}
+                        onMouseEnter={(e) => { (e.currentTarget as HTMLTableRowElement).style.backgroundColor = "var(--surface2-color)"; }}
+                        onMouseLeave={(e) => { (e.currentTarget as HTMLTableRowElement).style.backgroundColor = ""; }}
+                      >
+                        <td className="px-5 py-4">
+                          <p className="font-semibold text-sm line-clamp-1" style={{ color: "var(--text-primary)" }}>{q.title}</p>
+                          {q.description && <p className="text-xs line-clamp-1 mt-0.5" style={{ color: "var(--text-muted)" }}>{q.description}</p>}
+                        </td>
+                        <td className="px-5 py-4">
+                          <span className="inline-block px-2.5 py-1 rounded-md text-xs font-bold bg-sky-500/10 text-sky-600 border border-sky-500/20">
+                            {q.category || "General"}
+                          </span>
+                        </td>
+                        <td className="px-5 py-4">
+                          <Badge variant="neutral">{q.type ? q.type.replace(/_/g, " ") : "MCQ"}</Badge>
+                        </td>
+                        <td className="px-5 py-4">{diffBadge(q.difficulty)}</td>
+                        <td className="px-5 py-4 font-bold text-sm" style={{ color: "var(--text-primary)" }}>{q.marks} pts</td>
+                        <td className="px-5 py-4 text-right">
+                          <div className="flex items-center justify-end gap-1.5">
+                            <button
+                              onClick={() => setViewQuestion(q)}
+                              className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-sky-600 hover:bg-sky-500/10 transition-colors cursor-pointer"
+                              title="View Question"
+                            >
+                              <EyeIcon />
+                            </button>
+                            <button
+                              onClick={() => handleOpenEdit(q)}
+                              className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-amber-600 hover:bg-amber-500/10 transition-colors cursor-pointer"
+                              title="Edit Question"
+                            >
+                              <EditIcon />
+                            </button>
+                            <button
+                              onClick={() => setDeleteTarget(q)}
+                              className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-red-600 hover:bg-red-500/10 transition-colors cursor-pointer"
+                              title="Delete Question"
+                            >
+                              <TrashIcon />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+        )}
+      </div>
+
+      {/* CREATE QUESTION MODAL */}
+      <Modal open={showCreate} onClose={() => setShowCreate(false)} title="Create Question (Category Series)">
+        <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-1">
+          <Select
+            label="Question Category / Topic Series"
+            value={form.category}
+            onChange={(e) => setForm({ ...form, category: e.target.value })}
+            options={[
+              ...PRESET_CATEGORIES.map((c) => ({ value: c, label: c })),
+              { value: "Custom", label: "+ Add Custom Category..." },
+            ]}
+          />
+
+          {form.category === "Custom" && (
+            <Input
+              label="New Custom Category Name"
+              placeholder="e.g. Next.js, CyberSecurity, DevOps..."
+              value={form.customCategory}
+              onChange={(e) => setForm({ ...form, customCategory: e.target.value })}
+            />
+          )}
+
+          <Input
+            label="Question Title *"
+            value={form.title}
+            onChange={(e) => setForm({ ...form, title: e.target.value })}
+            placeholder="e.g., Explain the useMemo hook in React..."
+          />
+
+          <Textarea
+            label="Detailed Description / Problem Statement"
+            value={form.description}
+            onChange={(e) => setForm({ ...form, description: e.target.value })}
+            placeholder="Additional context or instructions for candidate..."
+          />
+
+          <div className="grid grid-cols-2 gap-3">
             <Select
-              value={typeFilter}
-              onChange={(e) => setTypeFilter(e.target.value)}
+              label="Type *"
+              value={form.type}
+              onChange={(e) => setForm({ ...form, type: e.target.value })}
               options={[
-                { value: "", label: "All Types" },
-                { value: "mcq_single", label: "MCQ Single" },
-                { value: "mcq_multi", label: "MCQ Multiple" },
-                { value: "true_false", label: "True/False" },
-                { value: "fill_blank", label: "Fill Blank" },
-                { value: "text_area", label: "Text Area" },
-                { value: "coding", label: "Coding" },
+                { value: "mcq_single", label: "Single Choice MCQ" },
+                { value: "mcq_multi", label: "Multiple Choice MCQ" },
+                { value: "coding", label: "Coding Monaco Editor" },
+                { value: "fill_blank", label: "Fill in Blanks" },
+                { value: "true_false", label: "True / False" },
+                { value: "text_area", label: "Text Area Response" },
               ]}
             />
             <Select
-              value={diffFilter}
-              onChange={(e) => setDiffFilter(e.target.value)}
+              label="Difficulty *"
+              value={form.difficulty}
+              onChange={(e) => setForm({ ...form, difficulty: e.target.value })}
               options={[
-                { value: "", label: "All Difficulty" },
                 { value: "easy", label: "Easy" },
                 { value: "medium", label: "Medium" },
                 { value: "hard", label: "Hard" },
               ]}
             />
           </div>
-          <Button onClick={() => setShowCreate(true)}>+ Add Question</Button>
-        </div>
 
-        {loading ? (
-          <Card><TableSkeleton /></Card>
-        ) : filtered.length === 0 ? (
-          <Card>
-            <EmptyState
-              title="No questions yet"
-              description="Build your question bank to create assessments"
-              actionLabel="Add Question"
-              onAction={() => setShowCreate(true)}
+          <div className="grid grid-cols-2 gap-3">
+            <Input
+              label="Marks / Score"
+              type="number"
+              value={form.marks}
+              onChange={(e) => setForm({ ...form, marks: Number(e.target.value) })}
             />
-          </Card>
-        ) : (
-          <Card className="overflow-hidden !p-0">
-            <table className="w-full">
-              <thead>
-                <tr style={{ borderBottom: "1px solid var(--border-color)" }}>
-                  <th className="text-left px-6 py-3 text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider">Question</th>
-                  <th className="text-left px-6 py-3 text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider">Type</th>
-                  <th className="text-left px-6 py-3 text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider">Difficulty</th>
-                  <th className="text-left px-6 py-3 text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider">Marks</th>
-                  <th className="text-right px-6 py-3 text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((q: any) => {
-                  const qId = q.id || q._id;
-                  return (
-                    <tr
-                      key={qId}
-                      style={{ borderBottom: "1px solid var(--border-color)", transition: "background .15s" }}
-                      onMouseEnter={(e) => { (e.currentTarget as HTMLTableRowElement).style.background = "var(--surface2-color)"; }}
-                      onMouseLeave={(e) => { (e.currentTarget as HTMLTableRowElement).style.background = ""; }}
-                    >
-                      <td className="px-6 py-4">
-                        <p className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>{q.title}</p>
-                        {q.tags && q.tags.length > 0 && (
-                          <div className="flex gap-1 mt-1">
-                            {q.tags.map((tag: string, i: number) => <Badge key={i} variant="neutral">{tag}</Badge>)}
-                          </div>
-                        )}
-                      </td>
-                      <td className="px-6 py-4"><Badge variant="accent">{typeLabel(q.type)}</Badge></td>
-                      <td className="px-6 py-4">{diffBadge(q.difficulty)}</td>
-                      <td className="px-6 py-4 text-sm" style={{ color: "var(--text-secondary)" }}>{q.marks}</td>
-                      <td className="px-6 py-4">
-                        {/* Sleek Action Buttons: View, Edit, Delete */}
-                        <div className="flex items-center justify-end gap-1">
-                          {/* View Icon */}
-                          <button
-                            type="button"
-                            title="View Detailed Question"
-                            onClick={() => setViewQuestion(q)}
-                            className="w-8 h-8 rounded-lg flex items-center justify-center transition-colors cursor-pointer"
-                            style={{ color: "var(--text-secondary)", background: "transparent" }}
-                            onMouseEnter={(e) => {
-                              (e.currentTarget as HTMLButtonElement).style.backgroundColor = "var(--badge-accent-bg)";
-                              (e.currentTarget as HTMLButtonElement).style.color = "#0284c7";
-                            }}
-                            onMouseLeave={(e) => {
-                              (e.currentTarget as HTMLButtonElement).style.backgroundColor = "transparent";
-                              (e.currentTarget as HTMLButtonElement).style.color = "var(--text-secondary)";
-                            }}
-                          >
-                            <EyeIcon />
-                          </button>
+            <Input
+              label="Negative Marks"
+              type="number"
+              value={form.negativeMarks}
+              onChange={(e) => setForm({ ...form, negativeMarks: Number(e.target.value) })}
+            />
+          </div>
 
-                          {/* Edit Icon */}
-                          <button
-                            type="button"
-                            title="Edit Question"
-                            onClick={() => handleOpenEdit(q)}
-                            className="w-8 h-8 rounded-lg flex items-center justify-center transition-colors cursor-pointer"
-                            style={{ color: "var(--text-secondary)", background: "transparent" }}
-                            onMouseEnter={(e) => {
-                              (e.currentTarget as HTMLButtonElement).style.backgroundColor = "var(--surface2-color)";
-                              (e.currentTarget as HTMLButtonElement).style.color = "var(--text-primary)";
-                            }}
-                            onMouseLeave={(e) => {
-                              (e.currentTarget as HTMLButtonElement).style.backgroundColor = "transparent";
-                              (e.currentTarget as HTMLButtonElement).style.color = "var(--text-secondary)";
-                            }}
-                          >
-                            <EditIcon />
-                          </button>
-
-                          {/* Delete Icon */}
-                          <button
-                            type="button"
-                            title="Delete Question"
-                            onClick={() => { setDeleteErr(""); setDeleteTarget(q); }}
-                            className="w-8 h-8 rounded-lg flex items-center justify-center transition-colors cursor-pointer"
-                            style={{ color: "#dc2626", background: "transparent" }}
-                            onMouseEnter={(e) => {
-                              (e.currentTarget as HTMLButtonElement).style.backgroundColor = "#fef2f2";
-                            }}
-                            onMouseLeave={(e) => {
-                              (e.currentTarget as HTMLButtonElement).style.backgroundColor = "transparent";
-                            }}
-                          >
-                            <TrashIcon />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </Card>
-        )}
-
-        {/* ── Comprehensive Detailed View Question Modal ────────────────────── */}
-        <Modal open={!!viewQuestion} onClose={() => setViewQuestion(null)} title="Detailed Question Information" size="lg">
-          {viewQuestion && (
-            <div className="space-y-5 max-h-[75vh] overflow-y-auto pr-1">
-              <div>
-                <span className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider">Title</span>
-                <p className="text-base font-bold mt-0.5" style={{ color: "var(--text-primary)" }}>{viewQuestion.title}</p>
-              </div>
-
-              {viewQuestion.description && (
-                <div>
-                  <span className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider">Description / Body</span>
-                  <div
-                    className="p-3 rounded-lg text-sm mt-1 border whitespace-pre-wrap font-mono"
-                    style={{ backgroundColor: "var(--surface2-color)", color: "var(--text-primary)", borderColor: "var(--border-color)" }}
-                  >
-                    {viewQuestion.description}
-                  </div>
-                </div>
-              )}
-
-              {/* Grid properties */}
-              <div className="grid grid-cols-4 gap-3">
-                <div className="p-3 rounded-lg border text-center" style={{ borderColor: "var(--border-color)", backgroundColor: "var(--surface2-color)" }}>
-                  <span className="text-xs text-[var(--text-muted)] block mb-1">Type</span>
-                  <Badge variant="accent">{typeLabel(viewQuestion.type)}</Badge>
-                </div>
-                <div className="p-3 rounded-lg border text-center" style={{ borderColor: "var(--border-color)", backgroundColor: "var(--surface2-color)" }}>
-                  <span className="text-xs text-[var(--text-muted)] block mb-1">Difficulty</span>
-                  {diffBadge(viewQuestion.difficulty)}
-                </div>
-                <div className="p-3 rounded-lg border text-center" style={{ borderColor: "var(--border-color)", backgroundColor: "var(--surface2-color)" }}>
-                  <span className="text-xs text-[var(--text-muted)] block">Marks</span>
-                  <span className="text-base font-bold text-emerald-600">+{viewQuestion.marks}</span>
-                </div>
-                <div className="p-3 rounded-lg border text-center" style={{ borderColor: "var(--border-color)", backgroundColor: "var(--surface2-color)" }}>
-                  <span className="text-xs text-[var(--text-muted)] block">Negative Marks</span>
-                  <span className="text-base font-bold text-red-500">-{viewQuestion.negativeMarks || 0}</span>
-                </div>
-              </div>
-
-              {/* Tags */}
-              {viewQuestion.tags && viewQuestion.tags.length > 0 && (
-                <div>
-                  <span className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider block mb-1.5">Tags</span>
-                  <div className="flex flex-wrap gap-1.5">
-                    {viewQuestion.tags.map((tag: string, i: number) => (
-                      <Badge key={i} variant="neutral">#{tag}</Badge>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* MCQ & True/False Options */}
-              {viewQuestion.options && viewQuestion.options.length > 0 && (
-                <div>
-                  <span className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider block mb-2">Options & Answer Key</span>
-                  <div className="space-y-2">
-                    {viewQuestion.options.map((opt: any, i: number) => (
-                      <div
-                        key={i}
-                        className="p-3 rounded-lg text-sm flex items-center justify-between border"
-                        style={{
-                          borderColor: opt.isCorrect ? "#16a34a" : "var(--border-color)",
-                          backgroundColor: opt.isCorrect ? "#f0fdf4" : "var(--surface2-color)",
-                          color: "var(--text-primary)",
-                        }}
-                      >
-                        <div className="flex items-center gap-3">
-                          <span
-                            className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
-                              opt.isCorrect ? "bg-emerald-600 text-white" : "bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300"
-                            }`}
-                          >
-                            {opt.id ? opt.id.toUpperCase() : String.fromCharCode(65 + i)}
-                          </span>
-                          <span className="font-medium">{opt.text}</span>
-                        </div>
-                        {opt.isCorrect ? (
-                          <Badge variant="success">✓ Correct Answer</Badge>
-                        ) : (
-                          <span className="text-xs text-[var(--text-muted)]">Incorrect</span>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Fill in the Blank Correct Answer */}
-              {viewQuestion.type === "fill_blank" && viewQuestion.correctTextAnswer && (
-                <div>
-                  <span className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider block mb-1">Fill Blank Answer Key</span>
-                  <div className="p-3 rounded-lg border text-sm font-semibold bg-emerald-500/10 border-emerald-500/30 text-emerald-600">
-                    {viewQuestion.correctTextAnswer}
-                  </div>
-                </div>
-              )}
-
-              {/* Coding Configuration */}
-              {viewQuestion.type === "coding" && viewQuestion.codeConfig && (
-                <div className="space-y-3">
-                  <span className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider block">Coding Details</span>
-                  <div className="flex items-center gap-4 text-xs">
-                    <span className="font-semibold" style={{ color: "var(--text-primary)" }}>Language: <Badge variant="accent">{viewQuestion.codeConfig.language}</Badge></span>
-                    <span style={{ color: "var(--text-muted)" }}>Disable Paste: {viewQuestion.codeConfig.disablePaste ? "Yes 🔒" : "No 🔓"}</span>
-                  </div>
-                  {viewQuestion.codeConfig.starterCode && (
-                    <div>
-                      <span className="text-xs text-[var(--text-muted)] block mb-1">Starter Code Template</span>
-                      <pre className="p-3 rounded-lg border text-xs font-mono overflow-x-auto" style={{ backgroundColor: "#0f172a", color: "#f8fafc", borderColor: "var(--border-color)" }}>
-                        <code>{viewQuestion.codeConfig.starterCode}</code>
-                      </pre>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              <div className="flex justify-end pt-4 border-t border-app-border">
-                <Button variant="secondary" onClick={() => setViewQuestion(null)}>Close</Button>
-              </div>
-            </div>
-          )}
-        </Modal>
-
-        {/* ── Comprehensive Detailed Edit Question Modal ──────────────────────── */}
-        <Modal open={!!editTarget} onClose={() => setEditTarget(null)} title="Edit Question Details" size="lg">
-          <div className="space-y-4 max-h-[75vh] overflow-y-auto pr-1">
-            <Input label="Question Title" value={editForm.title} onChange={(e) => setEditForm({ ...editForm, title: e.target.value })} />
-            <Textarea label="Description / Question Body" value={editForm.description} onChange={(e) => setEditForm({ ...editForm, description: e.target.value })} rows={4} />
-
-            <div className="grid grid-cols-2 gap-4">
-              <Select
-                label="Type"
-                value={editForm.type}
-                onChange={(e) => setEditForm({ ...editForm, type: e.target.value })}
-                options={[
-                  { value: "mcq_single", label: "MCQ (Single Choice)" },
-                  { value: "mcq_multi", label: "MCQ (Multiple Choice)" },
-                  { value: "true_false", label: "True / False" },
-                  { value: "fill_blank", label: "Fill in the Blank" },
-                  { value: "text_area", label: "Subjective / Text Area" },
-                  { value: "coding", label: "Coding Problem" },
-                ]}
-              />
-              <Select
-                label="Difficulty"
-                value={editForm.difficulty}
-                onChange={(e) => setEditForm({ ...editForm, difficulty: e.target.value })}
-                options={[
-                  { value: "easy", label: "Easy" },
-                  { value: "medium", label: "Medium" },
-                  { value: "hard", label: "Hard" },
-                ]}
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <Input label="Marks (+)" type="number" value={editForm.marks} onChange={(e) => setEditForm({ ...editForm, marks: parseInt(e.target.value) || 1 })} />
-              <Input label="Negative Marks (-)" type="number" value={editForm.negativeMarks} onChange={(e) => setEditForm({ ...editForm, negativeMarks: parseInt(e.target.value) || 0 })} />
-            </div>
-
-            <Input label="Tags (comma separated)" value={editForm.tags} onChange={(e) => setEditForm({ ...editForm, tags: e.target.value })} placeholder="javascript, react, frontend" />
-
-            {/* Options Editor for MCQ & True/False */}
-            {["mcq_single", "mcq_multi", "true_false"].includes(editForm.type) && (
-              <div className="space-y-3 pt-2">
-                <label className="block text-sm font-semibold text-[var(--text-primary)]">
-                  Edit Options & Correct Answers
-                </label>
-                <div className="space-y-2">
-                  {editForm.options.map((opt, i) => (
-                    <div key={opt.id || i} className="flex items-center gap-3">
-                      <input
-                        type={editForm.type === "mcq_multi" ? "checkbox" : "radio"}
-                        name="correct_edit"
-                        checked={opt.isCorrect}
-                        onChange={() => {
-                          const updated = editForm.options.map((o, j) => ({
-                            ...o,
-                            isCorrect: editForm.type === "mcq_multi" ? (j === i ? !o.isCorrect : o.isCorrect) : j === i,
-                          }));
-                          setEditForm({ ...editForm, options: updated });
-                        }}
-                        className="w-4 h-4 accent-sky-600"
-                      />
-                      <Input
-                        value={opt.text}
-                        onChange={(e) => {
-                          const updated = [...editForm.options];
-                          updated[i] = { ...updated[i], text: e.target.value };
-                          setEditForm({ ...editForm, options: updated });
-                        }}
-                        placeholder={`Option ${opt.id ? opt.id.toUpperCase() : String.fromCharCode(65 + i)}`}
-                        className="flex-1"
-                      />
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Fill Blank Edit */}
-            {editForm.type === "fill_blank" && (
-              <Input
-                label="Correct Answer Key"
-                value={editForm.correctTextAnswer}
-                onChange={(e) => setEditForm({ ...editForm, correctTextAnswer: e.target.value })}
-                placeholder="Enter exact correct text..."
-              />
-            )}
-
-            {/* Coding Config Edit */}
-            {editForm.type === "coding" && (
-              <div className="space-y-4 pt-2">
-                <Select
-                  label="Programming Language"
-                  value={editForm.codeLanguage}
-                  onChange={(e) => setEditForm({ ...editForm, codeLanguage: e.target.value })}
-                  options={[
-                    { value: "javascript", label: "JavaScript" },
-                    { value: "python", label: "Python" },
-                    { value: "java", label: "Java" },
-                    { value: "cpp", label: "C++" },
-                    { value: "typescript", label: "TypeScript" },
-                  ]}
-                />
-                <Textarea
-                  label="Starter Code Template"
-                  value={editForm.starterCode}
-                  onChange={(e) => setEditForm({ ...editForm, starterCode: e.target.value })}
-                  placeholder="// Starter code template..."
-                  rows={4}
-                />
-                <div className="flex items-center gap-2">
+          {/* MCQ Options */}
+          {["mcq_single", "mcq_multi", "true_false"].includes(form.type) && (
+            <div className="space-y-2 border-t pt-3" style={{ borderColor: "var(--border-color)" }}>
+              <p className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">MCQ Options Configuration</p>
+              {form.options.map((opt, idx) => (
+                <div key={opt.id} className="flex items-center gap-2">
                   <input
                     type="checkbox"
-                    id="editDisablePaste"
-                    checked={editForm.disablePaste}
-                    onChange={(e) => setEditForm({ ...editForm, disablePaste: e.target.checked })}
-                    className="w-4 h-4 accent-sky-600"
+                    checked={opt.isCorrect}
+                    onChange={(e) => {
+                      const updated = [...form.options];
+                      updated[idx].isCorrect = e.target.checked;
+                      setForm({ ...form, options: updated });
+                    }}
+                    className="accent-sky-600"
                   />
-                  <label htmlFor="editDisablePaste" className="text-sm font-medium text-[var(--text-primary)] cursor-pointer">
-                    Disable Paste in Code Editor during exam
-                  </label>
+                  <Input
+                    placeholder={`Option ${idx + 1}`}
+                    value={opt.text}
+                    onChange={(e) => {
+                      const updated = [...form.options];
+                      updated[idx].text = e.target.value;
+                      setForm({ ...form, options: updated });
+                    }}
+                  />
                 </div>
-              </div>
-            )}
-          </div>
+              ))}
+            </div>
+          )}
 
-          <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-app-border">
-            <Button variant="secondary" onClick={() => setEditTarget(null)}>Cancel</Button>
-            <Button onClick={handleUpdate} loading={updating} disabled={!editForm.title}>
-              Save Question Changes
+          {/* Coding Monaco Config */}
+          {form.type === "coding" && (
+            <div className="space-y-3 border-t pt-3" style={{ borderColor: "var(--border-color)" }}>
+              <Select
+                label="Programming Language"
+                value={form.codeLanguage}
+                onChange={(e) => setForm({ ...form, codeLanguage: e.target.value })}
+                options={[
+                  { value: "javascript", label: "JavaScript (Node.js)" },
+                  { value: "typescript", label: "TypeScript" },
+                  { value: "python", label: "Python 3" },
+                  { value: "java", label: "Java" },
+                  { value: "cpp", label: "C++" },
+                ]}
+              />
+              <Textarea
+                label="Starter Code Template"
+                value={form.starterCode}
+                onChange={(e) => setForm({ ...form, starterCode: e.target.value })}
+                rows={4}
+                placeholder="function solution() {\n  // write code here\n}"
+              />
+            </div>
+          )}
+
+          <div className="flex justify-end gap-3 pt-4">
+            <Button variant="secondary" onClick={() => setShowCreate(false)}>Cancel</Button>
+            <Button onClick={handleCreate} disabled={saving || !form.title}>
+              {saving ? "Creating..." : "Save Question"}
             </Button>
           </div>
-        </Modal>
+        </div>
+      </Modal>
 
-        {/* Delete Confirmation Modal */}
-        <Modal open={!!deleteTarget} onClose={() => { setDeleteTarget(null); setDeleteErr(""); }} title="Delete Question" size="sm">
-          <div className="space-y-4 text-center">
-            <div className="w-12 h-12 rounded-full bg-red-100 text-red-600 flex items-center justify-center mx-auto">
-              <TrashIcon />
+      {/* EDIT QUESTION MODAL */}
+      <Modal open={!!editTarget} onClose={() => setEditTarget(null)} title="Edit Question">
+        <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-1">
+          <Select
+            label="Question Category"
+            value={editForm.category}
+            onChange={(e) => setEditForm({ ...editForm, category: e.target.value })}
+            options={PRESET_CATEGORIES.map((c) => ({ value: c, label: c }))}
+          />
+          <Input
+            label="Question Title *"
+            value={editForm.title}
+            onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
+          />
+          <Textarea
+            label="Description"
+            value={editForm.description}
+            onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
+          />
+          <div className="flex justify-end gap-3 pt-4">
+            <Button variant="secondary" onClick={() => setEditTarget(null)}>Cancel</Button>
+            <Button onClick={handleUpdate} disabled={updating || !editForm.title}>
+              {updating ? "Saving..." : "Save Changes"}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* VIEW QUESTION MODAL */}
+      <Modal open={!!viewQuestion} onClose={() => setViewQuestion(null)} title="Question Preview">
+        {viewQuestion && (
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <Badge variant="neutral">{viewQuestion.type?.replace("_", " ")}</Badge>
+              <Badge variant="accent">{viewQuestion.category || "General"}</Badge>
+              <span className="text-xs text-[var(--text-muted)]">{viewQuestion.marks} marks</span>
             </div>
-            <p className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
-              Are you sure you want to delete <span className="font-bold">{deleteTarget?.title}</span>?
-            </p>
-            <p className="text-xs text-[var(--text-muted)]">This action cannot be undone.</p>
-            {deleteErr && <p className="text-xs text-red-600 font-medium">{deleteErr}</p>}
-          </div>
-          <div className="flex justify-end gap-3 mt-6">
-            <Button variant="secondary" onClick={() => { setDeleteTarget(null); setDeleteErr(""); }}>Cancel</Button>
-            <Button variant="danger" loading={deleting} onClick={handleDeleteConfirm}>Yes, Delete</Button>
-          </div>
-        </Modal>
-
-        {/* Add Question Modal */}
-        <Modal open={showCreate} onClose={() => setShowCreate(false)} title="Add Question" size="lg">
-          <div className="space-y-4 max-h-[70vh] overflow-y-auto">
-            <Input label="Title" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="Enter question title" />
-            <Textarea label="Description / Question Body" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Full question text..." />
-            
-            <div className="grid grid-cols-2 gap-4">
-              <Select
-                label="Type"
-                value={form.type}
-                onChange={(e) => setForm({ ...form, type: e.target.value })}
-                options={[
-                  { value: "mcq_single", label: "MCQ (Single)" },
-                  { value: "mcq_multi", label: "MCQ (Multiple)" },
-                  { value: "true_false", label: "True/False" },
-                  { value: "fill_blank", label: "Fill in the Blank" },
-                  { value: "text_area", label: "Text Area" },
-                  { value: "coding", label: "Coding" },
-                ]}
-              />
-              <Select
-                label="Difficulty"
-                value={form.difficulty}
-                onChange={(e) => setForm({ ...form, difficulty: e.target.value })}
-                options={[
-                  { value: "easy", label: "Easy" },
-                  { value: "medium", label: "Medium" },
-                  { value: "hard", label: "Hard" },
-                ]}
-              />
+            <h4 className="text-base font-bold text-[var(--text-primary)]">{viewQuestion.title}</h4>
+            {viewQuestion.description && <p className="text-xs text-[var(--text-muted)] leading-relaxed">{viewQuestion.description}</p>}
+            <div className="flex justify-end pt-4">
+              <Button variant="secondary" onClick={() => setViewQuestion(null)}>Close</Button>
             </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <Input label="Marks" type="number" value={form.marks} onChange={(e) => setForm({ ...form, marks: parseInt(e.target.value) || 1 })} />
-              <Input label="Negative Marks" type="number" value={form.negativeMarks} onChange={(e) => setForm({ ...form, negativeMarks: parseInt(e.target.value) || 0 })} />
-            </div>
-
-            <Input label="Tags (comma separated)" value={form.tags} onChange={(e) => setForm({ ...form, tags: e.target.value })} placeholder="javascript, react, frontend" />
-
-            {["mcq_single", "mcq_multi", "true_false"].includes(form.type) && (
-              <div>
-                <label className="block text-sm font-medium text-[var(--text-primary)] mb-2">Options</label>
-                <div className="space-y-2">
-                  {form.options.map((opt, i) => (
-                    <div key={opt.id} className="flex items-center gap-2">
-                      <input
-                        type={form.type === "mcq_multi" ? "checkbox" : "radio"}
-                        name="correct"
-                        checked={opt.isCorrect}
-                        onChange={() => {
-                          const newOpts = form.options.map((o, j) => ({
-                            ...o,
-                            isCorrect: form.type === "mcq_multi" ? (j === i ? !o.isCorrect : o.isCorrect) : j === i,
-                          }));
-                          setForm({ ...form, options: newOpts });
-                        }}
-                        className="accent-accent"
-                      />
-                      <Input
-                        value={opt.text}
-                        onChange={(e) => {
-                          const newOpts = [...form.options];
-                          newOpts[i] = { ...newOpts[i], text: e.target.value };
-                          setForm({ ...form, options: newOpts });
-                        }}
-                        placeholder={`Option ${opt.id.toUpperCase()}`}
-                        className="flex-1"
-                      />
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
           </div>
+        )}
+      </Modal>
 
-          <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-app-border">
-            <Button variant="secondary" onClick={() => setShowCreate(false)}>Cancel</Button>
-            <Button onClick={handleCreate} loading={saving} disabled={!form.title}>Create Question</Button>
-          </div>
-        </Modal>
-      </div>
+      {/* DELETE CONFIRMATION MODAL */}
+      <Modal open={!!deleteTarget} onClose={() => setDeleteTarget(null)} title="Delete Question">
+        <p className="text-sm text-[var(--text-muted)]">Are you sure you want to delete this question? This action cannot be undone.</p>
+        {deleteErr && <p className="text-xs text-red-500 font-semibold mt-2">{deleteErr}</p>}
+        <div className="flex justify-end gap-3 mt-6">
+          <Button variant="secondary" onClick={() => setDeleteTarget(null)}>Cancel</Button>
+          <Button variant="danger" onClick={handleDeleteConfirmed} disabled={deleting}>
+            {deleting ? "Deleting..." : "Delete Question"}
+          </Button>
+        </div>
+      </Modal>
     </div>
   );
 }
