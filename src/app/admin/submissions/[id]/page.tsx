@@ -224,7 +224,7 @@ export default function SubmissionDetailPage({ params }: { params: Promise<{ id:
   for (const item of deduplicatedRecordings) {
     const d = new Date(item.timestamp);
     const timeKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-    
+
     if (!groupedSessionsMap.has(timeKey)) {
       groupedSessionsMap.set(timeKey, []);
     }
@@ -570,7 +570,7 @@ export default function SubmissionDetailPage({ params }: { params: Promise<{ id:
 
                         <CodeEditor
                           value={ans?.codeAnswer || q.codeConfig?.starterCode || "// No code written by candidate"}
-                          onChange={() => {}}
+                          onChange={() => { }}
                           language={q.codeConfig?.language || "javascript"}
                           readOnly={true}
                           height="320px"
@@ -615,24 +615,61 @@ export default function SubmissionDetailPage({ params }: { params: Promise<{ id:
             <FileText className="w-4 h-4 text-sky-500" />
             Manual Score & Evaluation
           </h3>
-          <div className="flex items-center gap-4">
-            <div className="w-48">
-              <label className="text-xs font-semibold mb-1 block" style={{ color: "var(--text-muted)" }}>Manual Bonus / Adjustment Marks</label>
+
+          {/* Score info bar */}
+          <div className="flex items-center gap-4 p-3 rounded-xl border text-xs" style={{ backgroundColor: "var(--surface2-color)", borderColor: "var(--border-color)" }}>
+            <div>
+              <p className="text-[var(--text-muted)]">Test Total</p>
+              <p className="font-extrabold text-sky-600 text-base">{(submission as any).totalMarks || 100}</p>
+            </div>
+            <div className="w-px h-8" style={{ backgroundColor: "var(--border-color)" }} />
+            <div>
+              <p className="text-[var(--text-muted)]">Auto Score</p>
+              <p className="font-bold text-[var(--text-primary)] text-base">{submission.autoScore || 0}</p>
+            </div>
+            <div className="w-px h-8" style={{ backgroundColor: "var(--border-color)" }} />
+            <div>
+              <p className="text-[var(--text-muted)]">Max Manual Allowed</p>
+              <p className="font-bold text-emerald-600 text-base">
+                {Math.max(0, ((submission as any).totalMarks || 100) - (submission.autoScore || 0))}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-end gap-4">
+            <div className="w-48 space-y-1">
+              <label className="text-xs font-semibold block" style={{ color: "var(--text-muted)" }}>
+                Manual Marks
+                <span className="ml-1 text-sky-500 font-normal">
+                  (Max: {Math.max(0, ((submission as any).totalMarks || 100) - (submission.autoScore || 0))})
+                </span>
+              </label>
               <input
                 type="number"
+                min={0}
+                max={Math.max(0, ((submission as any).totalMarks || 100) - (submission.autoScore || 0))}
                 value={manualScore}
-                onChange={(e) => setManualScore(Number(e.target.value))}
-                className="w-full p-2.5 rounded-lg border text-sm outline-none focus:border-sky-500"
+                onChange={(e) => {
+                  const maxAllowed = Math.max(0, ((submission as any).totalMarks || 100) - (submission.autoScore || 0));
+                  // Hard clamp — cannot exceed max, cannot go below 0
+                  const val = Math.min(maxAllowed, Math.max(0, Number(e.target.value)));
+                  setManualScore(val);
+                }}
+                className="w-full p-2.5 rounded-lg border text-sm font-bold outline-none transition-all focus:border-sky-500"
                 style={{
                   backgroundColor: "var(--surface2-color)",
                   borderColor: "var(--border-color)",
                   color: "var(--text-primary)",
                 }}
               />
+              {/* Live final score preview */}
+              <p className="text-xs text-emerald-600 font-semibold">
+                Final: {Math.min(((submission as any).totalMarks || 100), (submission.autoScore || 0) + manualScore)} / {(submission as any).totalMarks || 100}
+              </p>
             </div>
-            <div className="pt-5">
-              <Button onClick={handleGrade} disabled={saving}>
-                {saving ? "Saving Grade..." : "Save Grade & Finalize"}
+            <div>
+              <Button onClick={handleGrade} disabled={saving} loading={saving}>
+                Save Grade & Finalize
               </Button>
             </div>
           </div>

@@ -5,10 +5,9 @@ import AdminHeader from "@/components/layout/AdminHeader";
 import Card from "@/components/ui/Card";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
-import Input from "@/components/ui/Input";
 import { TableSkeleton } from "@/components/ui/Skeleton";
 import EmptyState from "@/components/ui/EmptyState";
-import { CheckCircle2, BookOpen } from "lucide-react";
+import { CheckCircle2, BookOpen, AlertCircle } from "lucide-react";
 import { useGetSubmissionsQuery, useGradeSubmissionMutation } from "@/redux/api/submissionsApi";
 
 export default function GradingQueuePage() {
@@ -26,14 +25,23 @@ export default function GradingQueuePage() {
     autoScore: s.autoScore || 0,
     manualScore: s.manualScore || 0,
     finalScore: s.finalScore || s.autoScore || 0,
+    totalMarks: s.totalMarks || 100,
     status: s.status,
     submittedAt: s.submittedAt,
   }));
 
+  const totalMarks = selectedSub?.totalMarks || 100;
+  // Final score preview: cannot exceed totalMarks, cannot be less than 0
+  const previewFinal = Math.min(totalMarks, Math.max(0, (selectedSub?.autoScore || 0) + manualScoreInput));
+  const isOverLimit = (selectedSub?.autoScore || 0) + manualScoreInput > totalMarks;
+
   const handleGrade = async () => {
     if (!selectedSub) return;
+    // Clamp before sending: manual score should not push final above totalMarks
+    const maxManual = Math.max(0, totalMarks - (selectedSub.autoScore || 0));
+    const validManual = Math.min(maxManual, Math.max(0, manualScoreInput));
     try {
-      await gradeSub({ id: selectedSub.id, manualScore: manualScoreInput }).unwrap();
+      await gradeSub({ id: selectedSub.id, manualScore: validManual }).unwrap();
       setSelectedSub(null);
     } catch (e) {
       console.error("Grading failed", e);
@@ -61,14 +69,19 @@ export default function GradingQueuePage() {
           </Card>
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Submissions List */}
             <div className="lg:col-span-2 space-y-4">
               <Card className="!p-0 overflow-hidden">
-                <div className="p-4 border-b border-app-border font-semibold text-sm flex items-center justify-between" style={{ backgroundColor: "var(--surface2-color)", color: "var(--text-primary)" }}>
+                <div
+                  className="p-4 border-b font-semibold text-sm flex items-center justify-between"
+                  style={{ backgroundColor: "var(--surface2-color)", color: "var(--text-primary)", borderColor: "var(--border-color)" }}
+                >
                   <span>Candidate Submissions ({submissions.length})</span>
                 </div>
-                <div className="divide-y divide-app-border">
+                <div className="divide-y" style={{ borderColor: "var(--border-color)" }}>
                   {submissions.map((sub) => {
                     const isSelected = selectedSub?.id === sub.id;
+                    const pct = sub.totalMarks > 0 ? Math.round((sub.finalScore / sub.totalMarks) * 100) : 0;
 
                     return (
                       <div
@@ -77,18 +90,10 @@ export default function GradingQueuePage() {
                           setSelectedSub(sub);
                           setManualScoreInput(sub.manualScore);
                         }}
-                        className={`p-5 flex items-center justify-between cursor-pointer transition-colors ${
-                          isSelected ? "border-l-4 border-l-sky-600" : ""
-                        }`}
-                        style={{
-                          backgroundColor: isSelected ? "var(--surface2-color)" : "transparent",
-                        }}
-                        onMouseEnter={(e) => {
-                          if (!isSelected) (e.currentTarget as HTMLDivElement).style.backgroundColor = "var(--surface2-color)";
-                        }}
-                        onMouseLeave={(e) => {
-                          if (!isSelected) (e.currentTarget as HTMLDivElement).style.backgroundColor = "transparent";
-                        }}
+                        className={`p-5 flex items-center justify-between cursor-pointer transition-colors ${isSelected ? "border-l-4 border-l-sky-600" : ""}`}
+                        style={{ backgroundColor: isSelected ? "var(--surface2-color)" : "transparent" }}
+                        onMouseEnter={(e) => { if (!isSelected) (e.currentTarget as HTMLDivElement).style.backgroundColor = "var(--surface2-color)"; }}
+                        onMouseLeave={(e) => { if (!isSelected) (e.currentTarget as HTMLDivElement).style.backgroundColor = "transparent"; }}
                       >
                         <div className="space-y-1">
                           <div className="flex items-center gap-2">
@@ -101,10 +106,10 @@ export default function GradingQueuePage() {
                         </div>
 
                         <div className="text-right space-y-1">
-                          <p className="text-sm font-bold text-[var(--text-primary)]">Score: {sub.finalScore}</p>
-                          <p className="text-xs text-[var(--text-muted)]">
-                            Auto: {sub.autoScore} | Manual: {sub.manualScore}
+                          <p className="text-sm font-bold text-[var(--text-primary)]">
+                            {sub.finalScore} <span className="font-normal text-[var(--text-muted)]">/ {sub.totalMarks}</span>
                           </p>
+                          <p className="text-xs text-[var(--text-muted)]">{pct}% • Auto: {sub.autoScore} | Manual: {sub.manualScore}</p>
                         </div>
                       </div>
                     );
@@ -113,47 +118,88 @@ export default function GradingQueuePage() {
               </Card>
             </div>
 
+            {/* Grading Panel */}
             <div className="lg:col-span-1">
               {selectedSub ? (
-                <Card className="space-y-6">
-                  <div className="border-b border-app-border pb-4">
+                <Card className="space-y-5">
+                  <div className="border-b pb-4" style={{ borderColor: "var(--border-color)" }}>
                     <h3 className="text-lg font-bold text-[var(--text-primary)]">Grade Assessment</h3>
-                    <p className="text-xs text-[var(--text-muted)]">{selectedSub.candidateName} ({selectedSub.testTitle})</p>
+                    <p className="text-xs text-[var(--text-muted)]">{selectedSub.candidateName} — {selectedSub.testTitle}</p>
                   </div>
 
-                  <div className="space-y-3 p-4 rounded-xl border border-app-border text-sm" style={{ backgroundColor: "var(--surface2-color)" }}>
+                  {/* Score Summary */}
+                  <div className="space-y-2 p-4 rounded-xl border text-sm" style={{ backgroundColor: "var(--surface2-color)", borderColor: "var(--border-color)" }}>
                     <div className="flex justify-between">
-                      <span className="text-[var(--text-muted)]">Auto-Evaluated Score:</span>
+                      <span className="text-[var(--text-muted)]">Test Total Marks:</span>
+                      <span className="font-bold text-sky-600">{totalMarks} Marks</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-[var(--text-muted)]">Auto-Graded Score:</span>
                       <span className="font-semibold text-[var(--text-primary)]">{selectedSub.autoScore} pts</span>
                     </div>
-                    <div className="flex justify-between">
-                      <span className="text-[var(--text-muted)]">Current Manual Score:</span>
-                      <span className="font-semibold text-[var(--text-primary)]">{selectedSub.manualScore} pts</span>
+                    <div className="flex justify-between border-t pt-2 mt-1" style={{ borderColor: "var(--border-color)" }}>
+                      <span className="text-[var(--text-muted)]">Remaining for Manual:</span>
+                      <span className="font-bold text-emerald-600">
+                        {Math.max(0, totalMarks - (selectedSub.autoScore || 0))} pts max
+                      </span>
                     </div>
                   </div>
 
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2">
-                        Assign Additional Manual Marks
-                      </label>
-                      <Input
-                        type="number"
-                        value={manualScoreInput}
-                        onChange={(e) => setManualScoreInput(Number(e.target.value))}
-                        placeholder="Enter manual marks"
-                      />
-                    </div>
+                  {/* Manual Marks Input */}
+                  <div className="space-y-2">
+                    <label className="block text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>
+                      Manual Bonus Marks
+                      <span className="ml-2 text-sky-600 normal-case font-normal">(0 to {Math.max(0, totalMarks - (selectedSub.autoScore || 0))})</span>
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      max={Math.max(0, totalMarks - (selectedSub.autoScore || 0))}
+                      value={manualScoreInput}
+                      onChange={(e) => {
+                        const maxAllowed = Math.max(0, totalMarks - (selectedSub.autoScore || 0));
+                        // Hard-clamp: never allow value above max or below 0
+                        const val = Math.min(maxAllowed, Math.max(0, Number(e.target.value)));
+                        setManualScoreInput(val);
+                      }}
+                      className="w-full p-3 rounded-xl border text-lg font-extrabold outline-none transition-all text-center"
+                      style={{
+                        backgroundColor: "var(--surface2-color)",
+                        borderColor: isOverLimit ? "#ef4444" : "var(--border-color)",
+                        color: "var(--text-primary)",
+                      }}
+                    />
 
-                    <Button
-                      onClick={handleGrade}
-                      loading={grading}
-                      className="w-full"
-                    >
-                      <CheckCircle2 className="w-4 h-4 mr-2" />
-                      Save & Finalize Score
-                    </Button>
+                    {isOverLimit && (
+                      <p className="text-xs text-red-500 flex items-center gap-1">
+                        <AlertCircle className="w-3.5 h-3.5" />
+                        Total cannot exceed {totalMarks} marks
+                      </p>
+                    )}
                   </div>
+
+                  {/* Final Score Preview */}
+                  <div className="p-4 rounded-xl border text-center" style={{ backgroundColor: previewFinal >= totalMarks * 0.5 ? "#ecfdf5" : "#fef2f2", borderColor: previewFinal >= totalMarks * 0.5 ? "#10b981" : "#ef4444" }}>
+                    <p className="text-xs font-semibold uppercase tracking-wider mb-1" style={{ color: previewFinal >= totalMarks * 0.5 ? "#059669" : "#dc2626" }}>
+                      Final Score Preview
+                    </p>
+                    <p className="text-3xl font-extrabold" style={{ color: previewFinal >= totalMarks * 0.5 ? "#059669" : "#dc2626" }}>
+                      {previewFinal} <span className="text-base font-bold opacity-60">/ {totalMarks}</span>
+                    </p>
+                    <p className="text-xs mt-1" style={{ color: previewFinal >= totalMarks * 0.5 ? "#059669" : "#dc2626" }}>
+                      {totalMarks > 0 ? Math.round((previewFinal / totalMarks) * 100) : 0}%
+                    </p>
+                  </div>
+
+                  <Button
+                    onClick={handleGrade}
+                    loading={grading}
+                    className="w-full"
+                    disabled={isOverLimit}
+                  >
+                    <CheckCircle2 className="w-4 h-4 mr-2" />
+                    Save & Finalize Grade
+                  </Button>
                 </Card>
               ) : (
                 <Card className="text-center py-16 text-[var(--text-muted)]">

@@ -39,6 +39,12 @@ export default function NewTestPage() {
 
   const getQId = (q: Question): string => (q.id || q._id)?.toString() || "";
 
+  // Auto-computed total marks from selected questions
+  const totalMarks = selectedQuestionIds.reduce((sum, qid) => {
+    const q = questions.find((q) => getQId(q) === qid);
+    return sum + ((q as any)?.marks || 1);
+  }, 0);
+
   const toggleQuestion = (idStr: string) => {
     setSelectedQuestionIds((prev) =>
       prev.includes(idStr) ? prev.filter((qid) => qid !== idStr) : [...prev, idStr]
@@ -72,6 +78,7 @@ export default function NewTestPage() {
         description,
         sections: [{ title: "Section 1", questionIds: selectedQuestionIds, timeLimitSeconds: totalDuration * 60, randomizeQuestions: false }],
         totalDurationSeconds: totalDuration * 60,
+        totalMarks,
         passPercentage,
         proctoringConfig: {
           tabSwitchLimit,
@@ -127,7 +134,14 @@ export default function NewTestPage() {
                   Pick questions by React, Aptitude, Python, or Node.js topic series with instant description preview & option details
                 </p>
               </div>
-              <Badge variant="accent">{selectedQuestionIds.length} Questions Selected</Badge>
+              <div className="flex items-center gap-3">
+                <Badge variant="accent">{selectedQuestionIds.length} Questions Selected</Badge>
+                {totalMarks > 0 && (
+                  <Badge variant="neutral" className="bg-emerald-500/10 text-emerald-700 border-emerald-500/20">
+                    Total: {totalMarks} Marks
+                  </Badge>
+                )}
+              </div>
             </div>
 
             <CategoryQuestionPicker
@@ -194,6 +208,15 @@ export default function NewTestPage() {
           <Card>
             <h3 className="text-lg font-semibold mb-4 text-[var(--text-primary)]">Timing & Scoring</h3>
             <div className="space-y-4">
+              {/* Auto-calculated total marks */}
+              <div className="p-4 rounded-xl border" style={{ backgroundColor: "var(--surface2-color)", borderColor: "var(--border-color)" }}>
+                <p className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1">Test Total Marks (Auto-Calculated)</p>
+                <p className="text-3xl font-extrabold" style={{ color: "var(--text-primary)" }}>
+                  {totalMarks} <span className="text-sm font-semibold text-[var(--text-muted)]">marks ({selectedQuestionIds.length} questions)</span>
+                </p>
+                <p className="text-xs text-[var(--text-muted)] mt-1">Automatically summed from marks assigned to each selected question. To change this, update question marks or selection.</p>
+              </div>
+
               <Input
                 label="Total Duration (minutes)"
                 type="number"
@@ -205,6 +228,7 @@ export default function NewTestPage() {
                 type="number"
                 value={passPercentage}
                 onChange={(e) => setPassPercentage(parseInt(e.target.value) || 50)}
+                helperText={totalMarks > 0 ? `Pass mark = ${Math.ceil(totalMarks * passPercentage / 100)} / ${totalMarks}` : undefined}
               />
             </div>
             <div className="flex justify-between mt-6">
@@ -225,6 +249,14 @@ export default function NewTestPage() {
               <div className="flex justify-between py-2 border-b border-app-border dark:border-dark-border">
                 <span className="text-sm text-[var(--text-muted)]">Questions Selected</span>
                 <span className="text-sm font-medium text-[var(--text-primary)]">{selectedQuestionIds.length}</span>
+              </div>
+              <div className="flex justify-between py-2 border-b border-app-border dark:border-dark-border">
+                <span className="text-sm text-[var(--text-muted)]">Total Marks</span>
+                <span className="text-sm font-bold text-emerald-600">{totalMarks} Marks</span>
+              </div>
+              <div className="flex justify-between py-2 border-b border-app-border dark:border-dark-border">
+                <span className="text-sm text-[var(--text-muted)]">Pass Mark</span>
+                <span className="text-sm font-medium text-[var(--text-primary)]">{Math.ceil(totalMarks * passPercentage / 100)} / {totalMarks}</span>
               </div>
               <div className="flex justify-between py-2 border-b border-app-border dark:border-dark-border">
                 <span className="text-sm text-[var(--text-muted)]">Duration</span>
