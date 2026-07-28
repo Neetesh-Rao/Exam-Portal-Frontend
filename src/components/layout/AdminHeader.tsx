@@ -21,7 +21,13 @@ export default function AdminHeader({ title, subtitle }: { title: string; subtit
   };
 
   return (
-    <header className="h-16 border-b border-[var(--border-color)] bg-white dark:bg-dark-bg flex items-center justify-between px-8">
+    <header
+      className="h-16 flex items-center justify-between px-8"
+      style={{
+        backgroundColor: "var(--surface-color)",
+        borderBottom: "1px solid var(--border-color)",
+      }}
+    >
       <div>
         <h1 className="text-2xl font-bold tracking-tight text-[var(--text-primary)]">{title}</h1>
         {subtitle && <p className="text-sm text-[var(--text-muted)]">{subtitle}</p>}

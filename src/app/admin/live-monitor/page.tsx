@@ -100,7 +100,7 @@ export default function LiveMonitorPage() {
           <Card className="overflow-hidden !p-0">
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="border-b border-app-border dark:border-dark-border bg-app-bg-subtle dark:bg-dark-surface text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider">
+                <tr style={{ borderBottom: "1px solid var(--border-color)", backgroundColor: "var(--surface2-color)" }} className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider">
                   <th className="px-6 py-4">Candidate</th>
                   <th className="px-6 py-4">Assessment Title</th>
                   <th className="px-6 py-4">Status</th>
@@ -109,7 +109,7 @@ export default function LiveMonitorPage() {
                   <th className="px-6 py-4 text-right">Live Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-app-border dark:divide-dark-border text-sm">
+              <tbody className="text-sm">
                 <AnimatePresence>
                   {sessions.map((session: any) => {
                     const isFlagged = session.violationCount >= session.tabSwitchLimit;
@@ -120,9 +120,9 @@ export default function LiveMonitorPage() {
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
-                        className={`hover:bg-app-bg-subtle dark:hover:bg-dark-surface transition-colors ${
-                          isFlagged ? "bg-red-500/10 dark:bg-red-950/20" : ""
-                        }`}
+                        style={{ borderBottom: "1px solid var(--border-color)", transition: "background .15s" }}
+                        onMouseEnter={(e) => { (e.currentTarget as HTMLTableRowElement).style.background = "var(--surface2-color)"; }}
+                        onMouseLeave={(e) => { (e.currentTarget as HTMLTableRowElement).style.background = ""; }}
                       >
                         <td className="px-6 py-4">
                           <p className="font-semibold text-[var(--text-primary)]">{session.candidateName}</p>
@@ -137,9 +137,10 @@ export default function LiveMonitorPage() {
                             <span
                               className={`px-2.5 py-1 rounded-full text-xs font-bold border ${
                                 session.violationCount > 0
-                                  ? "bg-black text-white dark:bg-white dark:text-black border-transparent"
-                                  : "bg-app-bg-subtle dark:bg-dark-surface text-[var(--text-secondary)] border-app-border dark:border-dark-border"
+                                  ? "bg-red-500/10 text-red-600 border-red-500/20"
+                                  : "text-[var(--text-secondary)] border-app-border"
                               }`}
+                              style={session.violationCount === 0 ? { backgroundColor: "var(--surface2-color)" } : {}}
                             >
                               {session.violationCount} / {session.tabSwitchLimit}
                             </span>
@@ -165,7 +166,14 @@ export default function LiveMonitorPage() {
                           </Button>
                           <a
                             href={`/admin/submissions/${session.id}`}
-                            className="inline-flex items-center gap-1 text-xs font-semibold text-[var(--text-primary)] hover:text-black dark:hover:text-white bg-app-bg-subtle dark:bg-dark-surface hover:bg-gray-200 dark:hover:bg-neutral-800 px-3 py-1.5 rounded-lg border border-app-border dark:border-dark-border transition-colors"
+                            className="inline-flex items-center gap-1 text-xs font-semibold px-3 py-1.5 rounded-lg border transition-colors"
+                            style={{
+                              color: "var(--text-primary)",
+                              borderColor: "var(--border-color)",
+                              backgroundColor: "transparent",
+                            }}
+                            onMouseEnter={(e) => { (e.currentTarget as HTMLAnchorElement).style.backgroundColor = "var(--surface2-color)"; }}
+                            onMouseLeave={(e) => { (e.currentTarget as HTMLAnchorElement).style.backgroundColor = "transparent"; }}
                           >
                             <Eye className="w-3.5 h-3.5" />
                             Logs
@@ -186,7 +194,7 @@ export default function LiveMonitorPage() {
           title={`Live Proctoring Video Feed — ${activeStreamSession?.candidateName}`}
         >
           <div className="space-y-4">
-            <div className="flex items-center justify-between text-xs text-[var(--text-muted)] border-b border-app-border dark:border-dark-border pb-2">
+            <div className="flex items-center justify-between text-xs text-[var(--text-muted)] border-b border-app-border pb-2">
               <span>Assessment: {activeStreamSession?.testTitle}</span>
               <span className="font-semibold text-danger">Violations: {activeStreamSession?.violationCount} / {activeStreamSession?.tabSwitchLimit}</span>
             </div>

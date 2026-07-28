@@ -31,7 +31,12 @@ export default function Modal({
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="fixed inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
       <div
-        className={`relative bg-white dark:bg-dark-surface border border-[var(--border-color)] rounded-2xl shadow-lg w-full ${sizeClasses[size]} p-6`}
+        className={`relative rounded-2xl shadow-2xl w-full ${sizeClasses[size]} p-6`}
+        style={{
+          backgroundColor: "var(--surface-color)",
+          border: "1px solid var(--border-color)",
+          color: "var(--text-primary)",
+        }}
       >
         {title && (
           <div className="flex items-center justify-between mb-4">

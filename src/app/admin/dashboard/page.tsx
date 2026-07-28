@@ -47,18 +47,34 @@ export default function DashboardPage() {
                 { href: "/admin/questions", emoji: "❓", title: "Manage Questions", desc: "Add or edit question bank" },
                 { href: "/admin/candidates", emoji: "👥", title: "Invite Candidates", desc: "Send test invitations" },
               ].map((item) => (
-                <a key={item.href} href={item.href} className="flex items-center justify-between p-3 rounded-lg border border-app-border dark:border-dark-border hover:border-app-border-strong dark:hover:border-gray-700 transition-colors group">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-lg bg-gray-100 dark:bg-dark-surface flex items-center justify-center group-hover:bg-accent-subtle transition-colors">
-                      <span className="text-lg">{item.emoji}</span>
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-[var(--text-primary)]">{item.title}</p>
-                      <p className="text-xs text-[var(--text-muted)]">{item.desc}</p>
-                    </div>
+              <a
+                key={item.href}
+                href={item.href}
+                className="flex items-center justify-between p-3 rounded-lg transition-colors group"
+                style={{ border: "1px solid var(--border-color)" }}
+                onMouseEnter={(e) => {
+                  (e.currentTarget as HTMLAnchorElement).style.borderColor = "var(--border-color-strong)";
+                  (e.currentTarget as HTMLAnchorElement).style.backgroundColor = "var(--surface2-color)";
+                }}
+                onMouseLeave={(e) => {
+                  (e.currentTarget as HTMLAnchorElement).style.borderColor = "var(--border-color)";
+                  (e.currentTarget as HTMLAnchorElement).style.backgroundColor = "";
+                }}
+              >
+                <div className="flex items-center gap-3">
+                  <div
+                    className="w-10 h-10 rounded-lg flex items-center justify-center transition-colors"
+                    style={{ backgroundColor: "var(--surface2-color)" }}
+                  >
+                    <span className="text-lg">{item.emoji}</span>
                   </div>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-[var(--text-muted)]"><polyline points="9 18 15 12 9 6"/></svg>
-                </a>
+                  <div>
+                    <p className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>{item.title}</p>
+                    <p className="text-xs" style={{ color: "var(--text-muted)" }}>{item.desc}</p>
+                  </div>
+                </div>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ color: "var(--text-muted)" }}><polyline points="9 18 15 12 9 6"/></svg>
+              </a>
               ))}
             </div>
           </Card>

@@ -1,5 +1,5 @@
 "use client";
-import { ButtonHTMLAttributes, forwardRef } from "react";
+import { forwardRef } from "react";
 import { motion, HTMLMotionProps } from "framer-motion";
 
 type Variant = "primary" | "secondary" | "ghost" | "danger";
@@ -13,16 +13,20 @@ export interface ButtonProps extends Omit<HTMLMotionProps<"button">, "ref" | "ch
 }
 
 const variantClasses: Record<Variant, string> = {
-  primary: "bg-[var(--color-accent)] text-white hover:bg-[var(--color-accent-hover)] focus:ring-2 focus:ring-[var(--color-accent)] focus:ring-offset-2",
-  secondary: "bg-[var(--surface-color)] text-[var(--text-primary)] border border-[var(--border-color)] hover:border-[var(--border-color-strong)] hover:bg-[var(--color-bg-subtle)] focus:ring-2 focus:ring-[var(--color-accent)] focus:ring-offset-2",
-  ghost: "bg-transparent text-[var(--text-secondary)] hover:bg-[var(--color-bg-subtle)] hover:text-[var(--text-primary)]",
-  danger: "bg-[var(--color-danger)] text-white hover:opacity-90 focus:ring-2 focus:ring-[var(--color-danger)] focus:ring-offset-2",
+  primary:
+    "bg-sky-600 hover:bg-sky-700 text-white shadow-sm focus:ring-2 focus:ring-sky-500/30",
+  secondary:
+    "bg-[var(--surface-color)] text-[var(--text-primary)] border border-[var(--border-color)] hover:border-[var(--border-color-strong)] hover:bg-[var(--surface2-color)]",
+  ghost:
+    "bg-transparent text-[var(--text-secondary)] hover:bg-[var(--surface2-color)] hover:text-[var(--text-primary)]",
+  danger:
+    "bg-red-600 text-white hover:bg-red-700 focus:ring-2 focus:ring-red-500/30",
 };
 
 const sizeClasses: Record<Size, string> = {
-  sm: "h-9 px-3 text-xs",
-  md: "h-10 px-4 text-sm",
-  lg: "h-11 px-6 text-base",
+  sm: "h-9 px-3 text-xs font-semibold",
+  md: "h-10 px-4 text-sm font-semibold",
+  lg: "h-11 px-6 text-base font-semibold",
 };
 
 const Button = forwardRef<HTMLButtonElement, ButtonProps>(
@@ -31,7 +35,7 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       <motion.button
         ref={ref}
         whileTap={{ scale: 0.97 }}
-        className={`inline-flex items-center justify-center gap-2 font-semibold rounded-lg transition-colors duration-150 disabled:opacity-50 disabled:pointer-events-none cursor-pointer outline-none ${variantClasses[variant]} ${sizeClasses[size]} ${className}`}
+        className={`inline-flex items-center justify-center gap-2 rounded-lg transition-all duration-150 disabled:opacity-50 disabled:pointer-events-none cursor-pointer outline-none ${variantClasses[variant]} ${sizeClasses[size]} ${className}`}
         {...props}
       >
         {loading && (

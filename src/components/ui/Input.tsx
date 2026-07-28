@@ -18,11 +18,16 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
         )}
         <input
           ref={ref}
-          className={`w-full h-10 px-3 text-base bg-white dark:bg-dark-surface border rounded-lg transition-colors duration-150 placeholder:text-[var(--text-muted)] text-[var(--text-primary)] ${
+          className={`w-full h-10 px-3 text-base rounded-lg transition-colors duration-150 outline-none ${
             error
-              ? "border-danger focus:ring-2 focus:ring-danger/20"
-              : "border-[var(--border-color)] focus:border-accent focus:ring-2 focus:ring-accent/20"
-          } outline-none ${className}`}
+              ? "border-2 border-red-500 focus:ring-2 focus:ring-red-500/20"
+              : "border focus:ring-2 focus:ring-[var(--accent-color)]/20 focus:border-[var(--accent-color)]"
+          } ${className}`}
+          style={{
+            backgroundColor: "var(--surface2-color)",
+            color: "var(--text-primary)",
+            borderColor: error ? undefined : "var(--border-color)",
+          }}
           {...props}
         />
         {error && <p className="text-xs text-danger">{error}</p>}

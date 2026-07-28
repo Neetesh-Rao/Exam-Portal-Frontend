@@ -63,10 +63,10 @@ export default function GradingQueuePage() {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="lg:col-span-2 space-y-4">
               <Card className="!p-0 overflow-hidden">
-                <div className="p-4 bg-app-bg-subtle dark:bg-dark-surface border-b border-app-border dark:border-dark-border font-semibold text-sm flex items-center justify-between text-[var(--text-primary)]">
+                <div className="p-4 border-b border-app-border font-semibold text-sm flex items-center justify-between" style={{ backgroundColor: "var(--surface2-color)", color: "var(--text-primary)" }}>
                   <span>Candidate Submissions ({submissions.length})</span>
                 </div>
-                <div className="divide-y divide-app-border dark:divide-dark-border">
+                <div className="divide-y divide-app-border">
                   {submissions.map((sub) => {
                     const isSelected = selectedSub?.id === sub.id;
 
@@ -78,12 +78,21 @@ export default function GradingQueuePage() {
                           setManualScoreInput(sub.manualScore);
                         }}
                         className={`p-5 flex items-center justify-between cursor-pointer transition-colors ${
-                          isSelected ? "bg-app-bg-subtle dark:bg-dark-surface border-l-4 border-l-black dark:border-l-white" : "hover:bg-app-bg-subtle dark:hover:bg-dark-surface"
+                          isSelected ? "border-l-4 border-l-sky-600" : ""
                         }`}
+                        style={{
+                          backgroundColor: isSelected ? "var(--surface2-color)" : "transparent",
+                        }}
+                        onMouseEnter={(e) => {
+                          if (!isSelected) (e.currentTarget as HTMLDivElement).style.backgroundColor = "var(--surface2-color)";
+                        }}
+                        onMouseLeave={(e) => {
+                          if (!isSelected) (e.currentTarget as HTMLDivElement).style.backgroundColor = "transparent";
+                        }}
                       >
                         <div className="space-y-1">
                           <div className="flex items-center gap-2">
-                            <h4 className="font-semibold text-[var(--text-primary)] text-base">{sub.candidateName}</h4>
+                            <h4 className="font-semibold text-base" style={{ color: "var(--text-primary)" }}>{sub.candidateName}</h4>
                             <Badge variant={sub.status === "graded" ? "neutral" : "accent"}>
                               {sub.status ? sub.status.replace("_", " ") : "N/A"}
                             </Badge>
@@ -107,12 +116,12 @@ export default function GradingQueuePage() {
             <div className="lg:col-span-1">
               {selectedSub ? (
                 <Card className="space-y-6">
-                  <div className="border-b border-app-border dark:border-dark-border pb-4">
+                  <div className="border-b border-app-border pb-4">
                     <h3 className="text-lg font-bold text-[var(--text-primary)]">Grade Assessment</h3>
                     <p className="text-xs text-[var(--text-muted)]">{selectedSub.candidateName} ({selectedSub.testTitle})</p>
                   </div>
 
-                  <div className="space-y-3 bg-app-bg-subtle dark:bg-dark-surface p-4 rounded-xl border border-app-border dark:border-dark-border text-sm">
+                  <div className="space-y-3 p-4 rounded-xl border border-app-border text-sm" style={{ backgroundColor: "var(--surface2-color)" }}>
                     <div className="flex justify-between">
                       <span className="text-[var(--text-muted)]">Auto-Evaluated Score:</span>
                       <span className="font-semibold text-[var(--text-primary)]">{selectedSub.autoScore} pts</span>

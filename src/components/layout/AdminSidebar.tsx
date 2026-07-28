@@ -104,8 +104,17 @@ export default function AdminSidebar() {
   };
 
   return (
-    <aside className="w-64 h-screen bg-white dark:bg-dark-bg border-r border-[var(--border-color)] flex flex-col fixed left-0 top-0 z-40">
-      <div className="h-16 flex items-center px-4 border-b border-[var(--border-color)]">
+    <aside
+      className="w-64 h-screen flex flex-col fixed left-0 top-0 z-40"
+      style={{
+        backgroundColor: "var(--surface-color)",
+        borderRight: "1px solid var(--border-color)",
+      }}
+    >
+      <div
+        className="h-16 flex items-center px-4"
+        style={{ borderBottom: "1px solid var(--border-color)" }}
+      >
         <Link href="/admin/dashboard" className="flex items-center gap-2">
           <img src="/bitmax-logo.png" alt="Bitmax Technology" className="h-9 w-auto object-contain" />
         </Link>
@@ -118,10 +127,18 @@ export default function AdminSidebar() {
             <Link
               key={item.href}
               href={item.href}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 ${isActive
-                  ? "bg-gray-100 dark:bg-dark-surface text-[var(--text-primary)]"
-                  : "text-[var(--text-secondary)] hover:bg-app-bg-subtle dark:hover:bg-dark-surface hover:text-[var(--text-primary)] dark:hover:text-white"
-                }`}
+              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 ${
+                isActive
+                  ? "text-[var(--text-primary)]"
+                  : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+              }`}
+              style={isActive ? { backgroundColor: "var(--surface2-color)" } : {}}
+              onMouseEnter={(e) => {
+                if (!isActive) (e.currentTarget as HTMLAnchorElement).style.backgroundColor = "var(--surface2-color)";
+              }}
+              onMouseLeave={(e) => {
+                if (!isActive) (e.currentTarget as HTMLAnchorElement).style.backgroundColor = "";
+              }}
             >
               <span className={isActive ? "text-[var(--text-primary)]" : ""}>{item.icon}</span>
               {item.label}
@@ -130,13 +147,25 @@ export default function AdminSidebar() {
         })}
       </nav>
 
-      <div className="p-4 border-t border-[var(--border-color)]">
+      <div
+        className="p-4 pb-8"
+        style={{ borderTop: "1px solid var(--border-color)" }}
+      >
         <button
           type="button"
           onClick={handleLogout}
-          className="flex items-center gap-2 w-full px-3 py-2 text-sm text-[var(--text-muted)] hover:text-danger rounded-lg hover:bg-danger-subtle dark:hover:bg-danger/10 transition-colors cursor-pointer"
+          className="flex items-center gap-3 w-full px-3 py-2.5 text-sm font-medium rounded-lg transition-colors cursor-pointer"
+          style={{ color: "var(--text-muted)" }}
+          onMouseEnter={(e) => {
+            (e.currentTarget as HTMLButtonElement).style.color = "#dc2626";
+            (e.currentTarget as HTMLButtonElement).style.backgroundColor = "var(--badge-danger-bg)";
+          }}
+          onMouseLeave={(e) => {
+            (e.currentTarget as HTMLButtonElement).style.color = "var(--text-muted)";
+            (e.currentTarget as HTMLButtonElement).style.backgroundColor = "transparent";
+          }}
         >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
             <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" />
           </svg>
           Sign Out

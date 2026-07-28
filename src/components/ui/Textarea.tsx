@@ -11,17 +11,24 @@ const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
     return (
       <div className="space-y-1.5">
         {label && (
-          <label className="block text-sm font-medium text-[var(--text-primary)]">{label}</label>
+          <label className="block text-sm font-medium" style={{ color: "var(--text-primary)" }}>
+            {label}
+          </label>
         )}
         <textarea
           ref={ref}
-          className={`w-full px-3 py-3 text-base bg-white dark:bg-dark-surface border rounded-lg transition-colors duration-150 placeholder:text-[var(--text-muted)] text-[var(--text-primary)] ${
-            error ? "border-danger" : "border-[var(--border-color)] focus:border-accent focus:ring-2 focus:ring-accent/20"
-          } outline-none resize-none ${className}`}
+          className={`w-full px-3 py-2.5 text-sm rounded-lg transition-colors duration-150 outline-none resize-none ${
+            error ? "border-2 border-red-500" : "border focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500"
+          } ${className}`}
+          style={{
+            backgroundColor: "var(--surface2-color)",
+            color: "var(--text-primary)",
+            borderColor: error ? undefined : "var(--border-color)",
+          }}
           rows={4}
           {...props}
         />
-        {error && <p className="text-xs text-danger">{error}</p>}
+        {error && <p className="text-xs text-red-500">{error}</p>}
       </div>
     );
   }

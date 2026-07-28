@@ -1,70 +1,153 @@
 @import "tailwindcss";
 
+/* ── Design Tokens ──────────────────────────────────────────────────────────── */
 @theme {
-  --color-bg: #FFFFFF;
-  --color-bg-subtle: #FAFAFA;
-  --color-surface: #FFFFFF;
-  --color-border: #E5E5E5;
-  --color-border-strong: #D4D4D4;
-  --color-text-primary: #0A0A0A;
-  --color-text-secondary: #525252;
-  --color-text-muted: #737373;
-  --color-black: #0A0A0A;
-  --color-white: #FFFFFF;
-  
-  /* Pure Monochrome Accent (Black in Light, White in Dark) */
-  --color-accent: #0A0A0A;
-  --color-accent-hover: #262626;
-  --color-accent-subtle: #F5F5F5;
-  
-  --color-success: #171717;
-  --color-success-subtle: #F5F5F5;
-  --color-warning: #404040;
-  --color-warning-subtle: #F5F5F5;
-  --color-danger: #0A0A0A;
-  --color-danger-subtle: #FAFAFA;
-  
-  --color-bg-dark: #0A0A0A;
-  --color-surface-dark: #121212;
-  --color-border-dark: #262626;
-  --color-text-primary-dark: #FAFAFA;
-  --color-text-secondary-dark: #A3A3A3;
+  /* Light mode surfaces */
+  --color-bg:              #FFFFFF;
+  --color-bg-subtle:       #FAFAFA;
+  --color-surface:         #FFFFFF;
+  --color-border:          #E5E5E5;
+  --color-border-strong:   #D4D4D4;
+
+  /* Light mode text */
+  --color-text-primary:    #0A0A0A;
+  --color-text-secondary:  #525252;
+  --color-text-muted:      #737373;
+
+  /* Accent (black in light, white in dark) */
+  --color-accent:          #0A0A0A;
+  --color-accent-hover:    #262626;
+  --color-accent-subtle:   #F5F5F5;
+
+  /* Semantic colours — neutral monochrome palette */
+  --color-success:         #16a34a;
+  --color-success-subtle:  #f0fdf4;
+  --color-warning:         #d97706;
+  --color-warning-subtle:  #fffbeb;
+  --color-danger:          #dc2626;
+  --color-danger-subtle:   #fef2f2;
+
+  /* Dark mode surfaces (used via the .dark class below) */
+  --color-dark-bg:         #0A0A0A;
+  --color-dark-surface:    #141414;
+  --color-dark-surface2:   #1C1C1C;
+  --color-dark-border:     #2A2A2A;
+  --color-dark-border-strong: #3A3A3A;
+  --color-dark-text1:      #F5F5F5;
+  --color-dark-text2:      #A3A3A3;
+  --color-dark-text3:      #666666;
+
+  /* Tailwind shorthand tokens so "bg-dark-bg" etc. work in JSX */
+  --color-dark-bg:         #0A0A0A;
+  --color-surface-dark:    #141414;
+
+  /* Skeleton shimmer shades */
+  --color-skeleton-light:  #E5E7EB;
+  --color-skeleton-dark:   #262626;
 }
 
+/* ── CSS Custom Properties (switch on .dark) ───────────────────────────────── */
 :root {
-  --bg-color: var(--color-bg);
-  --surface-color: var(--color-surface);
-  --border-color: var(--color-border);
-  --text-primary: var(--color-text-primary);
-  --text-secondary: var(--color-text-secondary);
-  --accent-color: #0A0A0A;
-  --accent-fg: #FFFFFF;
+  --bg-color:           #FFFFFF;
+  --surface-color:      #FFFFFF;
+  --surface2-color:     #FAFAFA;
+  --border-color:       #E5E5E5;
+  --border-color-strong:#D4D4D4;
+  --text-primary:       #0A0A0A;
+  --text-secondary:     #525252;
+  --text-muted:         #737373;
+  --accent-color:       #0A0A0A;
+  --accent-fg:          #FFFFFF;
+
+  /* skeleton */
+  --skeleton-base:      #E5E7EB;
+  --skeleton-shine:     #F3F4F6;
+
+  /* badge colours — light mode */
+  --badge-neutral-bg:   #F5F5F5;  --badge-neutral-text: #525252;
+  --badge-success-bg:   #f0fdf4;  --badge-success-text: #16a34a;
+  --badge-warning-bg:   #fffbeb;  --badge-warning-text: #d97706;
+  --badge-danger-bg:    #fef2f2;  --badge-danger-text:  #dc2626;
+  --badge-accent-bg:    #eff6ff;  --badge-accent-text:  #2563eb;
 }
 
 .dark {
-  --bg-color: var(--color-bg-dark);
-  --surface-color: var(--color-surface-dark);
-  --border-color: var(--color-border-dark);
-  --text-primary: var(--color-text-primary-dark);
-  --text-secondary: var(--color-text-secondary-dark);
-  --accent-color: #FAFAFA;
-  --accent-fg: #0A0A0A;
+  --bg-color:           #0A0A0A;
+  --surface-color:      #141414;
+  --surface2-color:     #1C1C1C;
+  --border-color:       #2A2A2A;
+  --border-color-strong:#3A3A3A;
+  --text-primary:       #F5F5F5;
+  --text-secondary:     #A3A3A3;
+  --text-muted:         #666666;
+  --accent-color:       #F5F5F5;
+  --accent-fg:          #0A0A0A;
+
+  /* skeleton */
+  --skeleton-base:      #1C1C1C;
+  --skeleton-shine:     #262626;
+
+  /* badge colours — dark mode */
+  --badge-neutral-bg:   #262626;  --badge-neutral-text: #A3A3A3;
+  --badge-success-bg:   #052e16;  --badge-success-text: #4ade80;
+  --badge-warning-bg:   #1c1500;  --badge-warning-text: #fbbf24;
+  --badge-danger-bg:    #1c0505;  --badge-danger-text:  #f87171;
+  --badge-accent-bg:    #0a1628;  --badge-accent-text:  #60a5fa;
 }
 
+/* ── Tailwind v4 arbitrary-token shorthands ────────────────────────────────── */
+/* These let you write "bg-dark-bg", "bg-dark-surface", "border-dark-border"   */
+@layer utilities {
+  .bg-dark-bg       { background-color: #0A0A0A; }
+  .bg-dark-surface  { background-color: #141414; }
+  .bg-dark-surface2 { background-color: #1C1C1C; }
+  .border-dark-border        { border-color: #2A2A2A; }
+  .border-dark-border-strong { border-color: #3A3A3A; }
+  .text-dark-text1  { color: #F5F5F5; }
+  .text-dark-text2  { color: #A3A3A3; }
+
+  /* App-level aliases used in pages */
+  .bg-app-bg-subtle         { background-color: var(--surface2-color); }
+  .border-app-border        { border-color: var(--border-color); }
+  .border-app-border-strong { border-color: var(--border-color-strong); }
+  .text-app-muted           { color: var(--text-muted); }
+}
+
+/* ── Base reset ─────────────────────────────────────────────────────────────── */
 @layer base {
   * {
     border-color: var(--border-color);
+    box-sizing: border-box;
   }
-  
+
   body {
     background-color: var(--bg-color);
     color: var(--text-primary);
     -webkit-font-smoothing: antialiased;
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    transition: background-color 0.2s ease, color 0.2s ease;
+    transition: background-color 0.25s ease, color 0.2s ease;
   }
 }
 
+/* ── Skeleton shimmer animation ─────────────────────────────────────────────── */
+@keyframes shimmer {
+  0%   { background-position: -400px 0; }
+  100% { background-position:  400px 0; }
+}
+
+.skeleton-shimmer {
+  background: linear-gradient(
+    90deg,
+    var(--skeleton-base) 25%,
+    var(--skeleton-shine) 50%,
+    var(--skeleton-base) 75%
+  );
+  background-size: 800px 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+  border-radius: 0.5rem;
+}
+
+/* ── Glass utility ──────────────────────────────────────────────────────────── */
 @layer utilities {
   .glass {
     background-color: rgba(255, 255, 255, 0.85);
@@ -73,6 +156,7 @@
   .dark .glass {
     background-color: rgba(10, 10, 10, 0.85);
   }
+
   .monochrome-card {
     background-color: var(--surface-color);
     border: 1px solid var(--border-color);
@@ -81,21 +165,9 @@
   }
 }
 
-/* Custom sleek scrollbar */
-::-webkit-scrollbar {
-  width: 5px;
-  height: 5px;
-}
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-::-webkit-scrollbar-thumb {
-  background: #D4D4D4;
-  border-radius: 9999px;
-}
-.dark ::-webkit-scrollbar-thumb {
-  background: #262626;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: #A3A3A3;
-}
+/* ── Scrollbar ──────────────────────────────────────────────────────────────── */
+::-webkit-scrollbar        { width: 5px; height: 5px; }
+::-webkit-scrollbar-track  { background: transparent; }
+::-webkit-scrollbar-thumb  { background: #D4D4D4; border-radius: 9999px; }
+.dark ::-webkit-scrollbar-thumb { background: #2A2A2A; }
+::-webkit-scrollbar-thumb:hover  { background: #A3A3A3; }

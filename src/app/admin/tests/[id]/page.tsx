@@ -4,6 +4,7 @@ import AdminHeader from "@/components/layout/AdminHeader";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import Textarea from "@/components/ui/Textarea";
+import Select from "@/components/ui/Select";
 import Card from "@/components/ui/Card";
 import Badge from "@/components/ui/Badge";
 import Modal from "@/components/ui/Modal";
@@ -13,25 +14,36 @@ import {
   useUpdateTestMutation,
   usePublishTestMutation,
 } from "@/redux/api/testsApi";
+import { useGetCandidatesQuery } from "@/redux/api/candidatesApi";
 import { useSendBulkInvitesMutation } from "@/redux/api/invitesApi";
 
 export default function TestDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
 
   const { data, isLoading: loading } = useGetTestByIdQuery(id);
+  const { data: candidatesData } = useGetCandidatesQuery(undefined);
+
   const [updateTest, { isLoading: saving }] = useUpdateTestMutation();
   const [publishTest] = usePublishTestMutation();
   const [sendInvites, { isLoading: inviting }] = useSendBulkInvitesMutation();
 
   const test = data?.test;
+  const candidates: any[] = candidatesData?.candidates || [];
 
   const [editing, setEditing] = useState(false);
   const [title, setTitle] = useState(test?.title || "");
   const [description, setDescription] = useState(test?.description || "");
 
+  // Invite modal state
   const [inviteModal, setInviteModal] = useState(false);
   const [inviteEmails, setInviteEmails] = useState("");
-  const [expiryOption, setExpiryOption] = useState<string>("1_hour");
+  const [candidateSearch, setCandidateSearch] = useState("");
+  
+  // Custom Expiry state
+  const [expiryOption, setExpiryOption] = useState<string>("24_hours");
+  const [customVal, setCustomVal]         = useState<number>(30);
+  const [customUnit, setCustomUnit]       = useState<string>("minutes");
+
   const [inviteResults, setInviteResults] = useState<{ token: string; email: string; inviteLink?: string; expiresAt?: string }[]>([]);
 
   const handleSave = async () => {
@@ -51,17 +63,40 @@ export default function TestDetailPage({ params }: { params: Promise<{ id: strin
     }
   };
 
+  // Helper to toggle candidate email
+  const toggleCandidateEmail = (email: string) => {
+    const list = inviteEmails
+      .split(/[\n,]/)
+      .map((e) => e.trim())
+      .filter(Boolean);
+
+    if (list.includes(email)) {
+      setInviteEmails(list.filter((e) => e !== email).join("\n"));
+    } else {
+      setInviteEmails([...list, email].join("\n"));
+    }
+  };
+
   const handleInvite = async () => {
     const emails = inviteEmails.split(/[\n,]/).map((e) => e.trim()).filter(Boolean);
     if (!emails.length) return;
 
     let payload: any = { testId: id, candidateEmails: emails };
-    if (expiryOption === "1_hour") payload.expiresInHours = 1;
-    else if (expiryOption === "2_hours") payload.expiresInHours = 2;
-    else if (expiryOption === "6_hours") payload.expiresInHours = 6;
+
+    if (expiryOption === "15_mins")       payload.expiresInMinutes = 15;
+    else if (expiryOption === "30_mins")  payload.expiresInMinutes = 30;
+    else if (expiryOption === "1_hour")   payload.expiresInHours = 1;
+    else if (expiryOption === "2_hours")  payload.expiresInHours = 2;
+    else if (expiryOption === "6_hours")  payload.expiresInHours = 6;
     else if (expiryOption === "24_hours") payload.expiresInHours = 24;
-    else if (expiryOption === "7_days") payload.expiresInDays = 7;
-    else if (expiryOption === "30_days") payload.expiresInDays = 30;
+    else if (expiryOption === "7_days")   payload.expiresInDays = 7;
+    else if (expiryOption === "30_days")  payload.expiresInDays = 30;
+    else if (expiryOption === "custom") {
+      if (customUnit === "seconds")      payload.expiresInSeconds = customVal;
+      else if (customUnit === "minutes") payload.expiresInMinutes = customVal;
+      else if (customUnit === "hours")   payload.expiresInHours = customVal;
+      else if (customUnit === "days")    payload.expiresInDays = customVal;
+    }
 
     try {
       const res = await sendInvites(payload).unwrap();
@@ -87,6 +122,13 @@ export default function TestDetailPage({ params }: { params: Promise<{ id: strin
 
   const totalQuestions = (test.sections || []).reduce((sum: number, s: any) => sum + (s.questionIds?.length || 0), 0);
 
+  const selectedEmailsList = inviteEmails.split(/[\n,]/).map((e) => e.trim()).filter(Boolean);
+  const filteredCandidates = candidates.filter(
+    (c) =>
+      c.name.toLowerCase().includes(candidateSearch.toLowerCase()) ||
+      c.email.toLowerCase().includes(candidateSearch.toLowerCase())
+  );
+
   return (
     <div>
       <AdminHeader title={test.title} subtitle={`Test #${test.id}`} />
@@ -96,7 +138,7 @@ export default function TestDetailPage({ params }: { params: Promise<{ id: strin
             <Button onClick={handlePublish}>Publish Test</Button>
           )}
           <Button variant="secondary" onClick={() => { setTitle(test.title); setDescription(test.description || ""); setEditing(true); }}>Edit Details</Button>
-          <Button variant="secondary" onClick={() => setInviteModal(true)}>Invite Candidates</Button>
+          <Button variant="secondary" onClick={() => setInviteModal(true)}>✉️ Invite Candidates</Button>
           <Badge variant={test.status === "published" ? "success" : "warning"}>{test.status}</Badge>
         </div>
 
@@ -143,6 +185,7 @@ export default function TestDetailPage({ params }: { params: Promise<{ id: strin
           </div>
         </Modal>
 
+        {/* ── Candidate Invite Modal with Custom Expiration ──────────────────── */}
         <Modal open={inviteModal} onClose={() => { setInviteModal(false); setInviteResults([]); }} title="Invite Candidates to Assessment" size="lg">
           {inviteResults.length > 0 ? (
             <div>
@@ -151,12 +194,12 @@ export default function TestDetailPage({ params }: { params: Promise<{ id: strin
               </div>
               <div className="space-y-3 max-h-64 overflow-y-auto">
                 {inviteResults.map((inv) => (
-                  <div key={inv.token} className="p-3 border border-app-border dark:border-dark-border rounded-lg bg-app-bg-subtle/50 dark:bg-dark-surface/50">
+                  <div key={inv.token} className="p-3 border border-app-border rounded-lg bg-app-bg-subtle/50">
                     <div className="flex items-center justify-between">
                       <p className="text-sm font-bold text-[var(--text-primary)]">{inv.email}</p>
                       {inv.expiresAt && (
                         <span className="text-[11px] font-semibold text-amber-500">
-                          Expires: {new Date(inv.expiresAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          Expires: {new Date(inv.expiresAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} ({new Date(inv.expiresAt).toLocaleDateString()})
                         </span>
                       )}
                     </div>
@@ -172,33 +215,102 @@ export default function TestDetailPage({ params }: { params: Promise<{ id: strin
             </div>
           ) : (
             <div className="space-y-4">
+              {/* Candidate Suggestions Section */}
+              <div>
+                <label className="block text-sm font-medium text-[var(--text-primary)] mb-1.5">
+                  Select Candidates from Database ({candidates.length} available)
+                </label>
+                
+                <Input
+                  placeholder="Search candidate name or email..."
+                  value={candidateSearch}
+                  onChange={(e) => setCandidateSearch(e.target.value)}
+                  className="mb-2"
+                />
+
+                {candidates.length > 0 && (
+                  <div className="border border-app-border rounded-lg p-2 max-h-40 overflow-y-auto space-y-1" style={{ backgroundColor: "var(--surface2-color)" }}>
+                    {filteredCandidates.length === 0 ? (
+                      <p className="text-xs text-[var(--text-muted)] text-center py-2">No matching candidates found.</p>
+                    ) : (
+                      filteredCandidates.map((c: any) => {
+                        const isSelected = selectedEmailsList.includes(c.email);
+                        return (
+                          <div
+                            key={c.id || c._id}
+                            onClick={() => toggleCandidateEmail(c.email)}
+                            className="flex items-center justify-between p-2 rounded cursor-pointer transition-colors text-xs"
+                            style={{
+                              backgroundColor: isSelected ? "#eff6ff" : "transparent",
+                              color: isSelected ? "#0284c7" : "var(--text-primary)",
+                            }}
+                          >
+                            <div className="flex items-center gap-2">
+                              <span className="font-semibold">{c.name}</span>
+                              <span style={{ color: "var(--text-muted)" }}>({c.email})</span>
+                            </div>
+                            <span className="font-bold">{isSelected ? "✓ Selected" : "+ Add"}</span>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                )}
+              </div>
+
               <Textarea
-                label="Candidate Email Addresses"
+                label="Candidate Email Addresses (auto-filled or type manually)"
                 value={inviteEmails}
                 onChange={(e) => setInviteEmails(e.target.value)}
                 placeholder="Enter candidate emails (separated by commas or new lines)..."
-                rows={4}
+                rows={3}
               />
 
-              <div>
-                <label className="block text-sm font-medium text-[var(--text-primary)] mb-1.5">
-                  Assessment Link Expiration Time
-                </label>
-                <select
+              {/* Expiration Settings with Custom Option */}
+              <div className="space-y-2">
+                <Select
+                  label="Assessment Link Expiration Time"
                   value={expiryOption}
                   onChange={(e) => setExpiryOption(e.target.value)}
-                  className="w-full p-2.5 bg-white dark:bg-dark-surface border border-app-border dark:border-dark-border rounded-lg text-sm text-[var(--text-primary)] outline-none focus:border-accent"
-                >
-                  <option value="1_hour">⚡ 1 Hour Expiration</option>
-                  <option value="2_hours">⚡ 2 Hours Expiration</option>
-                  <option value="6_hours">⚡ 6 Hours Expiration</option>
-                  <option value="24_hours">📅 24 Hours (1 Day)</option>
-                  <option value="7_days">📅 7 Days</option>
-                  <option value="30_days">📅 30 Days</option>
-                </select>
-                <p className="text-xs text-[var(--text-muted)] mt-1">
-                  Once expired, candidate clicking the assessment link will be denied access.
-                </p>
+                  options={[
+                    { value: "15_mins", label: "⚡ 15 Minutes Expiration" },
+                    { value: "30_mins", label: "⚡ 30 Minutes Expiration" },
+                    { value: "1_hour", label: "⚡ 1 Hour Expiration" },
+                    { value: "2_hours", label: "⚡ 2 Hours Expiration" },
+                    { value: "6_hours", label: "⚡ 6 Hours Expiration" },
+                    { value: "24_hours", label: "📅 24 Hours (1 Day)" },
+                    { value: "7_days", label: "📅 7 Days" },
+                    { value: "30_days", label: "📅 30 Days" },
+                    { value: "custom", label: "⚙️ Custom Expiration (Set exact minutes/hours/seconds)..." },
+                  ]}
+                />
+
+                {expiryOption === "custom" && (
+                  <div className="p-3 rounded-lg border flex items-center gap-3" style={{ backgroundColor: "var(--surface2-color)", borderColor: "var(--border-color)" }}>
+                    <div className="flex-1">
+                      <Input
+                        label="Custom Expiration Value"
+                        type="number"
+                        min="1"
+                        value={customVal}
+                        onChange={(e) => setCustomVal(Math.max(1, parseInt(e.target.value) || 1))}
+                      />
+                    </div>
+                    <div className="w-40">
+                      <Select
+                        label="Time Unit"
+                        value={customUnit}
+                        onChange={(e) => setCustomUnit(e.target.value)}
+                        options={[
+                          { value: "seconds", label: "Seconds" },
+                          { value: "minutes", label: "Minutes" },
+                          { value: "hours", label: "Hours" },
+                          { value: "days", label: "Days" },
+                        ]}
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="p-3 bg-sky-500/10 border border-sky-500/20 rounded-lg text-xs text-sky-500 font-medium">
@@ -207,7 +319,9 @@ export default function TestDetailPage({ params }: { params: Promise<{ id: strin
 
               <div className="flex justify-end gap-3 pt-2">
                 <Button variant="secondary" onClick={() => setInviteModal(false)}>Cancel</Button>
-                <Button onClick={handleInvite} loading={inviting}>Send Email Invitations</Button>
+                <Button onClick={handleInvite} loading={inviting} disabled={!selectedEmailsList.length}>
+                  Send Invitations ({selectedEmailsList.length})
+                </Button>
               </div>
             </div>
           )}

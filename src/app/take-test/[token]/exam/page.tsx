@@ -599,7 +599,12 @@ export default function ExamPage({ params }: { params: Promise<{ token: string }
                   value={currentAnswer?.answerText || ""}
                   onChange={(e) => updateAnswer({ answerText: e.target.value })}
                   placeholder="Type your answer here..."
-                  className="w-full h-40 p-4 bg-app-bg-subtle dark:bg-dark-surface border border-app-border dark:border-dark-border rounded-lg text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] outline-none focus:border-accent resize-none"
+                  className="w-full h-40 p-4 border rounded-lg text-sm outline-none focus:border-sky-500 resize-none"
+                  style={{
+                    backgroundColor: "var(--surface2-color)",
+                    color: "var(--text-primary)",
+                    borderColor: "var(--border-color)",
+                  }}
                 />
               )}
 
