@@ -1,0 +1,517 @@
+"use client";
+import { useState } from "react";
+import Badge from "@/components/ui/Badge";
+import Input from "@/components/ui/Input";
+import Modal from "@/components/ui/Modal";
+
+export interface QuestionOption {
+  id: string;
+  text: string;
+  isCorrect?: boolean;
+}
+
+export interface Question {
+  id: string | number;
+  _id?: string;
+  category?: string;
+  title: string;
+  description?: string;
+  options?: QuestionOption[];
+  correctTextAnswer?: string;
+  codeConfig?: {
+    language?: string;
+    starterCode?: string;
+    disablePaste?: boolean;
+  };
+  type: string;
+  difficulty: string;
+  marks: number;
+  negativeMarks?: number;
+  tags?: string[];
+}
+
+interface CategoryQuestionPickerProps {
+  questions: Question[];
+  selectedQuestionIds: string[];
+  onToggleQuestion: (qid: string) => void;
+  onSelectAllCategory: (catName: string) => void;
+}
+
+export default function CategoryQuestionPicker({
+  questions,
+  selectedQuestionIds,
+  onToggleQuestion,
+  onSelectAllCategory,
+}: CategoryQuestionPickerProps) {
+  const [categoryFilter, setCategoryFilter] = useState("All");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [expandedIds, setExpandedIds] = useState<Record<string, boolean>>({});
+  const [modalQuestion, setModalQuestion] = useState<Question | null>(null);
+
+  const getQId = (q: Question): string => (q.id || q._id)?.toString() || "";
+
+  const toggleExpand = (qid: string) => {
+    setExpandedIds((prev) => ({ ...prev, [qid]: !prev[qid] }));
+  };
+
+  const toggleExpandAll = () => {
+    const allExpanded = questions.every((q) => expandedIds[getQId(q)]);
+    if (allExpanded) {
+      setExpandedIds({});
+    } else {
+      const next: Record<string, boolean> = {};
+      questions.forEach((q) => {
+        next[getQId(q)] = true;
+      });
+      setExpandedIds(next);
+    }
+  };
+
+  const diffBadge = (d: string) => {
+    const map: Record<string, "success" | "warning" | "danger"> = {
+      easy: "success",
+      medium: "warning",
+      hard: "danger",
+    };
+    return <Badge variant={map[d] || "neutral"}>{d}</Badge>;
+  };
+
+  // Categories list
+  const categoriesList = Array.from(new Set(["All", ...questions.map((q) => q.category || "General")]));
+
+  // Filtered questions based on Category & Search Query
+  const filteredQuestions = questions.filter((q) => {
+    if (categoryFilter !== "All" && (q.category || "General") !== categoryFilter) {
+      return false;
+    }
+    if (searchQuery.trim()) {
+      const term = searchQuery.toLowerCase();
+      const matchTitle = q.title.toLowerCase().includes(term);
+      const matchDesc = q.description?.toLowerCase().includes(term);
+      const matchTags = q.tags?.some((t) => t.toLowerCase().includes(term));
+      const matchCategory = q.category?.toLowerCase().includes(term);
+      return matchTitle || matchDesc || matchTags || matchCategory;
+    }
+    return true;
+  });
+
+  // Group questions by Category
+  const groupedMap = new Map<string, Question[]>();
+  for (const q of filteredQuestions) {
+    const cat = q.category || "General";
+    if (!groupedMap.has(cat)) groupedMap.set(cat, []);
+    groupedMap.get(cat)!.push(q);
+  }
+
+  const isAllExpanded = questions.length > 0 && filteredQuestions.every((q) => expandedIds[getQId(q)]);
+
+  return (
+    <div className="space-y-4">
+      {/* Search & Bulk Controls Header */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+        <div className="flex-1 max-w-md">
+          <Input
+            placeholder="🔍 Search questions by title, description or tag..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={toggleExpandAll}
+            className="px-3 py-1.5 text-xs font-semibold rounded-lg border transition-colors cursor-pointer bg-[var(--surface-color)] text-[var(--text-primary)] border-[var(--border-color)] hover:bg-[var(--surface2-color)]"
+          >
+            {isAllExpanded ? "Collapse All Descriptions ▲" : "Expand All Descriptions ▼"}
+          </button>
+        </div>
+      </div>
+
+      {/* Category Filter Tabs */}
+      <div className="flex flex-wrap gap-2 pt-1">
+        {categoriesList.map((cat) => {
+          const count = cat === "All" ? questions.length : questions.filter((q) => (q.category || "General") === cat).length;
+          const isActive = categoryFilter === cat;
+
+          return (
+            <button
+              key={cat}
+              onClick={() => setCategoryFilter(cat)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
+                isActive
+                  ? "bg-sky-600 text-white shadow-sm"
+                  : "bg-[var(--surface2-color)] text-[var(--text-muted)] hover:text-[var(--text-primary)] border"
+              }`}
+              style={{ borderColor: "var(--border-color)" }}
+            >
+              <span>{cat}</span>
+              <span className={`px-1.5 py-0.2 rounded text-[10px] ${isActive ? "bg-white/20 text-white" : "bg-sky-500/10 text-sky-600"}`}>
+                {count}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Question Bank List */}
+      {filteredQuestions.length === 0 ? (
+        <div className="text-center py-10 text-sm text-[var(--text-muted)] border rounded-xl p-6 bg-[var(--surface-color)]" style={{ borderColor: "var(--border-color)" }}>
+          {questions.length === 0 ? (
+            <>
+              No questions in bank.{" "}
+              <a href="/admin/questions" className="text-sky-500 underline font-medium">
+                Add questions to bank first →
+              </a>
+            </>
+          ) : (
+            "No questions match your current search or category filter."
+          )}
+        </div>
+      ) : (
+        <div className="space-y-6 max-h-[600px] overflow-y-auto pr-1 pt-2">
+          {Array.from(groupedMap.entries()).map(([catName, catQuestions]) => {
+            const catQIds = catQuestions.map(getQId);
+            const allSelected = catQIds.every((id) => selectedQuestionIds.includes(id));
+
+            return (
+              <div
+                key={catName}
+                className="space-y-3 p-4 rounded-xl border"
+                style={{ backgroundColor: "var(--surface2-color)", borderColor: "var(--border-color)" }}
+              >
+                {/* Category Header */}
+                <div className="flex items-center justify-between pb-2 border-b" style={{ borderColor: "var(--border-color)" }}>
+                  <div className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-sky-500"></span>
+                    <h4 className="text-sm font-bold text-[var(--text-primary)] uppercase tracking-wider">{catName} Series</h4>
+                    <span className="text-xs text-[var(--text-muted)]">({catQuestions.length} Questions)</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => onSelectAllCategory(catName)}
+                    className="text-xs font-semibold text-sky-600 hover:underline cursor-pointer"
+                  >
+                    {allSelected ? "✓ Deselect Category" : "+ Select All Category Questions"}
+                  </button>
+                </div>
+
+                {/* Questions List */}
+                <div className="space-y-3">
+                  {catQuestions.map((q) => {
+                    const qid = getQId(q);
+                    const isChecked = selectedQuestionIds.includes(qid);
+                    const isExpanded = !!expandedIds[qid];
+
+                    return (
+                      <div
+                        key={qid}
+                        className={`p-3.5 rounded-xl border transition-all ${
+                          isChecked
+                            ? "border-sky-500/80 bg-sky-500/5 shadow-sm"
+                            : "border-app-border dark:border-dark-border hover:border-sky-400 bg-[var(--surface-color)]"
+                        }`}
+                      >
+                        {/* Top Header Row */}
+                        <div className="flex items-start gap-3">
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={() => onToggleQuestion(qid)}
+                            className="mt-1 w-4 h-4 accent-sky-600 rounded cursor-pointer shrink-0"
+                          />
+                          
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="flex-1 min-w-0">
+                                <h5
+                                  onClick={() => toggleExpand(qid)}
+                                  className="text-sm font-bold text-[var(--text-primary)] cursor-pointer hover:text-sky-600 transition-colors leading-tight"
+                                >
+                                  {q.title}
+                                </h5>
+
+                                {/* Description Preview (2-line truncated) */}
+                                {q.description ? (
+                                  <p className="text-xs text-[var(--text-muted)] mt-1.5 line-clamp-2 leading-relaxed font-normal">
+                                    {q.description}
+                                  </p>
+                                ) : q.options && q.options.length > 0 ? (
+                                  <p className="text-xs text-[var(--text-muted)] mt-1.5 truncate italic">
+                                    Options ({q.options.length}): {q.options.map((o) => o.text).filter(Boolean).join(" • ")}
+                                  </p>
+                                ) : (
+                                  <p className="text-xs text-[var(--text-muted)] mt-1.5 italic">
+                                    No detailed description provided
+                                  </p>
+                                )}
+                              </div>
+
+                              {/* View Details Expand Button */}
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                <button
+                                  type="button"
+                                  onClick={() => toggleExpand(qid)}
+                                  className="text-xs font-semibold text-sky-600 hover:text-sky-700 dark:text-sky-400 dark:hover:text-sky-300 flex items-center gap-1 px-2.5 py-1 rounded-lg bg-sky-50 dark:bg-sky-950/50 border border-sky-200 dark:border-sky-800/80 cursor-pointer transition-colors"
+                                >
+                                  {isExpanded ? (
+                                    <>
+                                      <span>Hide</span>
+                                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M18 15l-6-6-6 6"/></svg>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <span>👁 Details</span>
+                                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M6 9l6 6 6-6"/></svg>
+                                    </>
+                                  )}
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* Badges Bar */}
+                            <div className="flex flex-wrap items-center gap-2 mt-2.5">
+                              <Badge variant="neutral">{q.type ? q.type.replace("_", " ") : "mcq"}</Badge>
+                              {diffBadge(q.difficulty)}
+                              <span className="text-xs text-[var(--text-muted)] font-medium">{q.marks} marks</span>
+                              {q.negativeMarks ? (
+                                <span className="text-xs text-rose-500 font-medium">(-{q.negativeMarks} negative)</span>
+                              ) : null}
+                              {q.tags && q.tags.length > 0 && (
+                                <div className="flex flex-wrap gap-1">
+                                  {q.tags.map((t, idx) => (
+                                    <span key={idx} className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-mono">
+                                      #{t}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Expanded Full Question Section */}
+                        {isExpanded && (
+                          <div
+                            className="mt-4 pt-3.5 border-t text-xs space-y-3.5"
+                            style={{ borderColor: "var(--border-color)" }}
+                          >
+                            {/* Full Question Text */}
+                            <div>
+                              <div className="flex items-center justify-between mb-1">
+                                <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
+                                  Full Question Description:
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => setModalQuestion(q)}
+                                  className="text-[11px] font-semibold text-sky-600 hover:underline cursor-pointer"
+                                >
+                                  Open in Popup ↗
+                                </button>
+                              </div>
+                              <div className="p-3 rounded-lg bg-[var(--surface2-color)] border border-app-border dark:border-dark-border text-[var(--text-primary)] whitespace-pre-wrap leading-relaxed font-sans text-xs">
+                                {q.description || q.title}
+                              </div>
+                            </div>
+
+                            {/* MCQ Options Display */}
+                            {q.options && q.options.length > 0 && (
+                              <div>
+                                <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)] block mb-1.5">
+                                  Options & Answer Key:
+                                </span>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                  {q.options.map((opt, idx) => {
+                                    const letter = String.fromCharCode(65 + idx);
+                                    return (
+                                      <div
+                                        key={opt.id || idx}
+                                        className={`p-2.5 rounded-lg border text-xs flex items-center justify-between gap-2 ${
+                                          opt.isCorrect
+                                            ? "bg-emerald-500/10 border-emerald-500/40 text-emerald-700 dark:text-emerald-300 font-medium"
+                                            : "bg-[var(--surface2-color)] border-app-border dark:border-dark-border text-[var(--text-primary)]"
+                                        }`}
+                                      >
+                                        <div className="flex items-center gap-2 min-w-0">
+                                          <span
+                                            className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${
+                                              opt.isCorrect
+                                                ? "bg-emerald-500 text-white"
+                                                : "bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300"
+                                            }`}
+                                          >
+                                            {letter}
+                                          </span>
+                                          <span className="break-words">{opt.text}</span>
+                                        </div>
+                                        {opt.isCorrect && (
+                                          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500 text-white shrink-0">
+                                            ✓ Correct
+                                          </span>
+                                        )}
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Starter Code Block */}
+                            {q.codeConfig?.starterCode && (
+                              <div>
+                                <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)] block mb-1">
+                                  Starter Code ({q.codeConfig.language || "code"}):
+                                </span>
+                                <pre className="p-3 rounded-lg bg-slate-900 text-slate-100 text-xs overflow-x-auto font-mono leading-relaxed border border-slate-800">
+                                  <code>{q.codeConfig.starterCode}</code>
+                                </pre>
+                              </div>
+                            )}
+
+                            {/* Text Answer */}
+                            {q.correctTextAnswer && (
+                              <div className="p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-300 text-xs">
+                                <span className="font-bold">Expected Answer: </span>
+                                <code>{q.correctTextAnswer}</code>
+                              </div>
+                            )}
+
+                            {/* Action Button */}
+                            <div className="flex justify-end pt-1">
+                              <button
+                                type="button"
+                                onClick={() => onToggleQuestion(qid)}
+                                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                                  isChecked
+                                    ? "bg-rose-500/10 text-rose-600 hover:bg-rose-500/20 border border-rose-200 dark:border-rose-900"
+                                    : "bg-sky-600 text-white hover:bg-sky-700 shadow-sm"
+                                }`}
+                              >
+                                {isChecked ? (
+                                  <>
+                                    <span>✕ Remove from Test</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <span>+ Add to Test</span>
+                                  </>
+                                )}
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Modal Popup for Full Question View */}
+      {modalQuestion && (
+        <Modal
+          open={!!modalQuestion}
+          onClose={() => setModalQuestion(null)}
+          title={`Question Details: ${modalQuestion.title}`}
+          size="lg"
+        >
+          <div className="space-y-4 text-xs text-[var(--text-primary)]">
+            <div className="flex flex-wrap items-center gap-2 pb-2 border-b" style={{ borderColor: "var(--border-color)" }}>
+              <Badge variant="accent">{modalQuestion.category || "General"}</Badge>
+              <Badge variant="neutral">{modalQuestion.type ? modalQuestion.type.replace("_", " ") : "mcq"}</Badge>
+              {diffBadge(modalQuestion.difficulty)}
+              <span className="font-semibold text-[var(--text-muted)]">{modalQuestion.marks} marks</span>
+              {modalQuestion.negativeMarks ? (
+                <span className="text-rose-500">(-{modalQuestion.negativeMarks} neg)</span>
+              ) : null}
+            </div>
+
+            <div>
+              <h4 className="text-sm font-bold mb-2">Description / Statement:</h4>
+              <div className="p-4 rounded-xl bg-[var(--surface2-color)] border border-app-border dark:border-dark-border text-sm whitespace-pre-wrap leading-relaxed">
+                {modalQuestion.description || modalQuestion.title}
+              </div>
+            </div>
+
+            {modalQuestion.options && modalQuestion.options.length > 0 && (
+              <div>
+                <h4 className="text-sm font-bold mb-2">Options:</h4>
+                <div className="space-y-2">
+                  {modalQuestion.options.map((opt, idx) => {
+                    const letter = String.fromCharCode(65 + idx);
+                    return (
+                      <div
+                        key={opt.id || idx}
+                        className={`p-3 rounded-lg border flex items-center justify-between gap-3 text-sm ${
+                          opt.isCorrect
+                            ? "bg-emerald-500/10 border-emerald-500/40 text-emerald-700 dark:text-emerald-300 font-semibold"
+                            : "bg-[var(--surface2-color)] border-app-border dark:border-dark-border"
+                        }`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <span
+                            className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
+                              opt.isCorrect
+                                ? "bg-emerald-500 text-white"
+                                : "bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300"
+                            }`}
+                          >
+                            {letter}
+                          </span>
+                          <span>{opt.text}</span>
+                        </div>
+                        {opt.isCorrect && (
+                          <span className="px-2.5 py-1 rounded-md text-xs font-bold bg-emerald-500 text-white">
+                            ✓ Correct Answer
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {modalQuestion.codeConfig?.starterCode && (
+              <div>
+                <h4 className="text-sm font-bold mb-2">Starter Code ({modalQuestion.codeConfig.language || "code"}):</h4>
+                <pre className="p-4 rounded-xl bg-slate-900 text-slate-100 text-xs overflow-x-auto font-mono leading-relaxed border border-slate-800">
+                  <code>{modalQuestion.codeConfig.starterCode}</code>
+                </pre>
+              </div>
+            )}
+
+            <div className="flex justify-between items-center pt-4 border-t" style={{ borderColor: "var(--border-color)" }}>
+              <button
+                type="button"
+                onClick={() => {
+                  const qid = getQId(modalQuestion);
+                  onToggleQuestion(qid);
+                }}
+                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  selectedQuestionIds.includes(getQId(modalQuestion))
+                    ? "bg-rose-500 text-white hover:bg-rose-600"
+                    : "bg-sky-600 text-white hover:bg-sky-700"
+                }`}
+              >
+                {selectedQuestionIds.includes(getQId(modalQuestion))
+                  ? "✕ Remove from Test"
+                  : "+ Add Question to Test"}
+              </button>
+              <button
+                type="button"
+                onClick={() => setModalQuestion(null)}
+                className="px-4 py-2 rounded-xl text-xs font-semibold bg-[var(--surface2-color)] hover:bg-[var(--surface-color)] border border-[var(--border-color)] text-[var(--text-primary)] cursor-pointer"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
+    </div>
+  );
+}
