@@ -62,6 +62,15 @@ export default function TestInstructionsPage({ params }: { params: Promise<{ tok
       return;
     }
 
+    // Trigger Fullscreen on candidate click gesture
+    try {
+      if (!document.fullscreenElement) {
+        await document.documentElement.requestFullscreen();
+      }
+    } catch (e) {
+      console.warn("Fullscreen request on click:", e);
+    }
+
     try {
       const result = await startSubmission({ token }).unwrap();
 

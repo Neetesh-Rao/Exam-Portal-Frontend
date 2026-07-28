@@ -725,6 +725,29 @@ export default function ExamPage({ params }: { params: Promise<{ token: string }
         </div>
       </Modal>
 
+      {/* Mandatory Fullscreen Start / Lock Modal Overlay */}
+      {!isFullscreenMode && proctoringConfig.fullScreenRequired && !loading && !testEnded && !submitting && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-2xl p-6 max-w-md w-full text-center space-y-5 shadow-2xl">
+            <div className="w-16 h-16 rounded-full bg-sky-500/10 text-sky-600 dark:text-sky-400 flex items-center justify-center mx-auto text-3xl font-extrabold">
+              ⛶
+            </div>
+            <div>
+              <h3 className="text-xl font-extrabold text-slate-900 dark:text-white">Fullscreen Required for Exam</h3>
+              <p className="text-xs text-slate-600 dark:text-slate-300 mt-2 leading-relaxed font-medium">
+                This proctored assessment requires Fullscreen mode to protect exam integrity. Please click below to activate Fullscreen and begin taking your exam.
+              </p>
+            </div>
+            <Button
+              onClick={requestFullscreenMode}
+              className="w-full bg-sky-600 hover:bg-sky-700 text-white font-extrabold py-3 text-sm rounded-xl shadow-lg"
+            >
+              ⛶ Enter Fullscreen Mode & Begin Exam
+            </Button>
+          </div>
+        </div>
+      )}
+
       {/* Submitting Loading Overlay */}
       {submitting && (
         <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex flex-col items-center justify-center text-white space-y-4">
