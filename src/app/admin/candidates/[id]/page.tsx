@@ -21,6 +21,7 @@ interface CandidateData {
     createdAt: string;
     videoRecordingUrl?: string;
     screenRecordingUrl?: string;
+    recordingSnapshots?: any[];
     test: { id: string; title: string } | null;
     violations: { id: string; type: string; createdAt: string }[];
   }[];
@@ -162,15 +163,15 @@ export default function CandidateDetailPage({ params }: { params: Promise<{ id: 
                       </p>
                     </div>
                     <div>
-                      <p className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>Camera Video</p>
-                      <p className="text-xs font-semibold text-emerald-600">
-                        {sub.videoRecordingUrl ? "✓ Recorded" : "—"}
+                      <p className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>Proctoring Snapshots</p>
+                      <p className="text-xs font-bold text-emerald-600">
+                        {sub.recordingSnapshots?.length ? `${sub.recordingSnapshots.length} Captured` : "Active Snapshots"}
                       </p>
                     </div>
                     <div>
-                      <p className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>Screen Capture</p>
-                      <p className="text-xs font-semibold text-sky-600">
-                        {sub.screenRecordingUrl ? "✓ Recorded" : "—"}
+                      <p className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>Proctoring Status</p>
+                      <p className="text-xs font-bold text-sky-600">
+                        Proctored Session
                       </p>
                     </div>
                   </div>
