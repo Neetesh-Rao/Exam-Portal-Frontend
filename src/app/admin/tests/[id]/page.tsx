@@ -1,5 +1,6 @@
 "use client";
 import { useState, use } from "react";
+import { useRouter } from "next/navigation";
 import AdminHeader from "@/components/layout/AdminHeader";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
@@ -19,6 +20,7 @@ import { useSendBulkInvitesMutation } from "@/redux/api/invitesApi";
 
 export default function TestDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
+  const router = useRouter();
 
   const { data, isLoading: loading } = useGetTestByIdQuery(id);
   const { data: candidatesData } = useGetCandidatesQuery(undefined);
@@ -33,6 +35,7 @@ export default function TestDetailPage({ params }: { params: Promise<{ id: strin
   const [editing, setEditing] = useState(false);
   const [title, setTitle] = useState(test?.title || "");
   const [description, setDescription] = useState(test?.description || "");
+  const [expandedQuestionIds, setExpandedQuestionIds] = useState<Record<string, boolean>>({});
 
   // Invite modal state
   const [inviteModal, setInviteModal] = useState(false);
@@ -41,10 +44,14 @@ export default function TestDetailPage({ params }: { params: Promise<{ id: strin
   
   // Custom Expiry state
   const [expiryOption, setExpiryOption] = useState<string>("24_hours");
-  const [customVal, setCustomVal]         = useState<number>(30);
-  const [customUnit, setCustomUnit]       = useState<string>("minutes");
+  const [customVal, setCustomVal] = useState<number>(30);
+  const [customUnit, setCustomUnit] = useState<string>("minutes");
 
   const [inviteResults, setInviteResults] = useState<{ token: string; email: string; inviteLink?: string; expiresAt?: string }[]>([]);
+
+  const toggleExpandQuestion = (qid: string) => {
+    setExpandedQuestionIds((prev) => ({ ...prev, [qid]: !prev[qid] }));
+  };
 
   const handleSave = async () => {
     try {
@@ -63,7 +70,6 @@ export default function TestDetailPage({ params }: { params: Promise<{ id: strin
     }
   };
 
-  // Helper to toggle candidate email
   const toggleCandidateEmail = (email: string) => {
     const list = inviteEmails
       .split(/[\n,]/)
@@ -106,21 +112,73 @@ export default function TestDetailPage({ params }: { params: Promise<{ id: strin
     }
   };
 
+  const diffBadge = (d: string) => {
+    const map: Record<string, "success" | "warning" | "danger"> = {
+      easy: "success",
+      medium: "warning",
+      hard: "danger",
+    };
+    return <Badge variant={map[d] || "neutral"}>{d || "medium"}</Badge>;
+  };
+
   if (loading) return (
     <div>
-      <AdminHeader title="Loading..." />
-      <div className="p-8 max-w-4xl mx-auto"><CardSkeleton /></div>
+      <AdminHeader title="Loading Assessment Test..." />
+      <div className="p-8 max-w-5xl mx-auto space-y-4">
+        <CardSkeleton />
+        <CardSkeleton />
+      </div>
     </div>
   );
 
   if (!test) return (
     <div>
       <AdminHeader title="Test Not Found" />
-      <div className="p-8 text-center text-[var(--text-muted)]">This test does not exist.</div>
+      <div className="p-8 text-center text-[var(--text-muted)]">This test does not exist or was deleted.</div>
     </div>
   );
 
-  const totalQuestions = (test.sections || []).reduce((sum: number, s: any) => sum + (s.questionIds?.length || 0), 0);
+  // Extract all questions across all sections
+  const allQuestions: any[] = [];
+  (test.sections || []).forEach((sec: any) => {
+    (sec.questionIds || []).forEach((q: any) => {
+      if (q) allQuestions.push(q);
+    });
+  });
+
+  const totalQuestions = allQuestions.length;
+  const totalMarks = allQuestions.reduce((sum, q) => sum + (typeof q === "object" ? (q.marks || 1) : 1), 0);
+
+  // Category distribution
+  const categoryStats = new Map<string, { count: number; marks: number }>();
+  allQuestions.forEach((q) => {
+    if (typeof q === "object") {
+      const cat = q.category || "General";
+      const current = categoryStats.get(cat) || { count: 0, marks: 0 };
+      categoryStats.set(cat, {
+        count: current.count + 1,
+        marks: current.marks + (q.marks || 1),
+      });
+    }
+  });
+
+  const isAllExpanded = allQuestions.length > 0 && allQuestions.every((q) => {
+    const qid = typeof q === "object" ? (q.id || q._id?.toString()) : q;
+    return expandedQuestionIds[qid];
+  });
+
+  const toggleExpandAll = () => {
+    if (isAllExpanded) {
+      setExpandedQuestionIds({});
+    } else {
+      const next: Record<string, boolean> = {};
+      allQuestions.forEach((q) => {
+        const qid = typeof q === "object" ? (q.id || q._id?.toString()) : q;
+        if (qid) next[qid] = true;
+      });
+      setExpandedQuestionIds(next);
+    }
+  };
 
   const selectedEmailsList = inviteEmails.split(/[\n,]/).map((e) => e.trim()).filter(Boolean);
   const filteredCandidates = candidates.filter(
@@ -131,61 +189,361 @@ export default function TestDetailPage({ params }: { params: Promise<{ id: strin
 
   return (
     <div>
-      <AdminHeader title={test.title} subtitle={`Test #${test.id}`} />
-      <div className="p-8 max-w-4xl mx-auto space-y-6">
-        <div className="flex items-center gap-3">
-          {test.status === "draft" && (
-            <Button onClick={handlePublish}>Publish Test</Button>
-          )}
-          <Button variant="secondary" onClick={() => { setTitle(test.title); setDescription(test.description || ""); setEditing(true); }}>Edit Details</Button>
-          <Button variant="secondary" onClick={() => setInviteModal(true)}>✉️ Invite Candidates</Button>
-          <Badge variant={test.status === "published" ? "success" : "warning"}>{test.status}</Badge>
+      <AdminHeader
+        title={test.title}
+        subtitle={`Assessment ID: #${test.id || test._id} • Created ${new Date(test.createdAt || Date.now()).toLocaleDateString()}`}
+      />
+
+      <div className="p-8 max-w-5xl mx-auto space-y-6">
+        {/* Top Control Action Bar */}
+        <div className="flex flex-wrap items-center justify-between gap-3 bg-[var(--surface-color)] p-4 rounded-2xl border" style={{ borderColor: "var(--border-color)" }}>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => router.push("/admin/tests")}
+              className="text-xs font-semibold text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors flex items-center gap-1 cursor-pointer"
+            >
+              ← Back to Tests
+            </button>
+            <span className="text-[var(--border-color)]">|</span>
+            <Badge variant={test.status === "published" ? "success" : "warning"}>
+              {test.status === "published" ? "✓ Published" : "Draft Mode"}
+            </Badge>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2.5">
+            {test.status === "draft" && (
+              <Button onClick={handlePublish} variant="primary">
+                🚀 Publish Test
+              </Button>
+            )}
+            <Button
+              variant="secondary"
+              onClick={() => router.push(`/admin/tests/${id}/edit`)}
+            >
+              ✏️ Edit Questions & Settings
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={() => { setTitle(test.title); setDescription(test.description || ""); setEditing(true); }}
+            >
+              ⚙️ Quick Edit Info
+            </Button>
+            <Button
+              onClick={() => setInviteModal(true)}
+              className="bg-sky-600 hover:bg-sky-700 text-white shadow-sm"
+            >
+              ✉️ Invite Candidates
+            </Button>
+          </div>
         </div>
 
-        <Card>
-          <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-4">Test Details</h3>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <p className="text-xs text-[var(--text-muted)] mb-1">Duration</p>
-              <p className="text-sm font-medium text-[var(--text-primary)]">{Math.floor((test.totalDurationSeconds || 3600) / 60)} minutes</p>
+        {/* Executive Summary Stats Grid */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <Card className="p-4 space-y-1">
+            <span className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">Total Duration</span>
+            <p className="text-xl font-extrabold text-[var(--text-primary)]">
+              {Math.floor((test.totalDurationSeconds || 3600) / 60)} <span className="text-sm font-normal text-[var(--text-muted)]">mins</span>
+            </p>
+          </Card>
+
+          <Card className="p-4 space-y-1">
+            <span className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">Passing Mark</span>
+            <p className="text-xl font-extrabold text-sky-600 dark:text-sky-400">
+              {test.passPercentage}% <span className="text-sm font-normal text-[var(--text-muted)]">score</span>
+            </p>
+          </Card>
+
+          <Card className="p-4 space-y-1">
+            <span className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">Total Questions</span>
+            <p className="text-xl font-extrabold text-[var(--text-primary)]">
+              {totalQuestions} <span className="text-sm font-normal text-[var(--text-muted)]">items</span>
+            </p>
+          </Card>
+
+          <Card className="p-4 space-y-1">
+            <span className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">Total Marks</span>
+            <p className="text-xl font-extrabold text-emerald-600 dark:text-emerald-400">
+              {totalMarks} <span className="text-sm font-normal text-[var(--text-muted)]">points</span>
+            </p>
+          </Card>
+        </div>
+
+        {/* Test Overview Description Card */}
+        {test.description && (
+          <Card className="space-y-2">
+            <h4 className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">Test Objective / Overview</h4>
+            <p className="text-sm text-[var(--text-primary)] leading-relaxed whitespace-pre-wrap">
+              {test.description}
+            </p>
+          </Card>
+        )}
+
+        {/* Category Breakdown & Series Stats */}
+        {categoryStats.size > 0 && (
+          <Card className="space-y-3">
+            <div className="flex items-center justify-between">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">
+                Category Distribution ({categoryStats.size} Topic Series Included)
+              </h4>
             </div>
-            <div>
-              <p className="text-xs text-[var(--text-muted)] mb-1">Pass Percentage</p>
-              <p className="text-sm font-medium text-[var(--text-primary)]">{test.passPercentage}%</p>
+            <div className="flex flex-wrap gap-2.5">
+              {Array.from(categoryStats.entries()).map(([catName, stats]) => (
+                <div
+                  key={catName}
+                  className="px-3 py-2 rounded-xl border flex items-center gap-2 text-xs"
+                  style={{ backgroundColor: "var(--surface2-color)", borderColor: "var(--border-color)" }}
+                >
+                  <span className="w-2 h-2 rounded-full bg-sky-500"></span>
+                  <span className="font-bold text-[var(--text-primary)]">{catName} Series:</span>
+                  <span className="text-sky-600 dark:text-sky-400 font-semibold">{stats.count} Qs</span>
+                  <span className="text-[var(--text-muted)]">({stats.marks} pts)</span>
+                </div>
+              ))}
             </div>
+          </Card>
+        )}
+
+        {/* Comprehensive Included Questions List Card */}
+        <Card className="space-y-4">
+          <div className="flex items-center justify-between border-b pb-3" style={{ borderColor: "var(--border-color)" }}>
             <div>
-              <p className="text-xs text-[var(--text-muted)] mb-1">Total Questions</p>
-              <p className="text-sm font-medium text-[var(--text-primary)]">{totalQuestions}</p>
+              <h3 className="text-base font-bold text-[var(--text-primary)]">Included Questions ({totalQuestions})</h3>
+              <p className="text-xs text-[var(--text-muted)]">Full list of questions set for candidate assessment</p>
             </div>
-            <div>
-              <p className="text-xs text-[var(--text-muted)] mb-1">Sections</p>
-              <p className="text-sm font-medium text-[var(--text-primary)]">{test.sections?.length || 0}</p>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={toggleExpandAll}
+                className="px-3 py-1.5 text-xs font-semibold rounded-lg border transition-colors cursor-pointer bg-[var(--surface-color)] text-[var(--text-primary)] border-[var(--border-color)] hover:bg-[var(--surface2-color)]"
+              >
+                {isAllExpanded ? "Collapse All Details ▲" : "Expand All Question Details ▼"}
+              </button>
+              <Button
+                variant="secondary"
+                onClick={() => router.push(`/admin/tests/${id}/edit`)}
+              >
+                + Add / Remove Questions
+              </Button>
+            </div>
+          </div>
+
+          {allQuestions.length === 0 ? (
+            <div className="text-center py-10 text-sm text-[var(--text-muted)] border rounded-xl p-6" style={{ borderColor: "var(--border-color)" }}>
+              No questions added to this test yet.{" "}
+              <button
+                onClick={() => router.push(`/admin/tests/${id}/edit`)}
+                className="text-sky-500 underline font-semibold cursor-pointer"
+              >
+                Add questions from bank →
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {allQuestions.map((q: any, idx: number) => {
+                const isObj = typeof q === "object";
+                const qid = isObj ? (q.id || q._id?.toString() || idx) : q;
+                const isExpanded = !!expandedQuestionIds[qid];
+
+                if (!isObj) {
+                  return (
+                    <div key={qid} className="p-3 rounded-lg border text-xs text-[var(--text-muted)]">
+                      Question ID: <code className="font-mono">{qid}</code>
+                    </div>
+                  );
+                }
+
+                return (
+                  <div
+                    key={qid}
+                    className="p-4 rounded-xl border transition-all bg-[var(--surface-color)] hover:border-sky-400"
+                    style={{ borderColor: "var(--border-color)" }}
+                  >
+                    {/* Header Row */}
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-start gap-3 flex-1 min-w-0">
+                        <span className="w-6 h-6 rounded-full bg-sky-500/10 text-sky-600 dark:text-sky-400 flex items-center justify-center text-xs font-bold shrink-0 mt-0.5">
+                          {idx + 1}
+                        </span>
+                        <div className="flex-1 min-w-0">
+                          <h5
+                            onClick={() => toggleExpandQuestion(qid)}
+                            className="text-sm font-bold text-[var(--text-primary)] cursor-pointer hover:text-sky-600 transition-colors leading-tight"
+                          >
+                            {q.title}
+                          </h5>
+
+                          {/* Truncated description preview */}
+                          {q.description ? (
+                            <p className="text-xs text-[var(--text-muted)] mt-1 line-clamp-2 leading-relaxed">
+                              {q.description}
+                            </p>
+                          ) : q.options && q.options.length > 0 ? (
+                            <p className="text-xs text-[var(--text-muted)] mt-1 truncate italic">
+                              Options ({q.options.length}): {q.options.map((o: any) => o.text).filter(Boolean).join(" • ")}
+                            </p>
+                          ) : null}
+
+                          {/* Badges Bar */}
+                          <div className="flex flex-wrap items-center gap-2 mt-2.5">
+                            <Badge variant="accent">{q.category || "General"}</Badge>
+                            <Badge variant="neutral">{q.type ? q.type.replace(/_/g, " ") : "mcq"}</Badge>
+                            {diffBadge(q.difficulty)}
+                            <span className="text-xs font-semibold text-[var(--text-primary)]">{q.marks || 1} marks</span>
+                            {q.negativeMarks ? (
+                              <span className="text-xs text-rose-500 font-medium">(-{q.negativeMarks} negative)</span>
+                            ) : null}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* View Details Toggle */}
+                      <button
+                        type="button"
+                        onClick={() => toggleExpandQuestion(qid)}
+                        className="text-xs font-semibold text-sky-600 hover:text-sky-700 dark:text-sky-400 flex items-center gap-1 px-2.5 py-1 rounded-lg bg-sky-50 dark:bg-sky-950/50 border border-sky-200 dark:border-sky-800 shrink-0 cursor-pointer"
+                      >
+                        {isExpanded ? "Hide Details ▲" : "👁 Question Details ▼"}
+                      </button>
+                    </div>
+
+                    {/* Expanded Section */}
+                    {isExpanded && (
+                      <div className="mt-4 pt-3.5 border-t text-xs space-y-3.5" style={{ borderColor: "var(--border-color)" }}>
+                        {/* Full Description */}
+                        <div>
+                          <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)] block mb-1">
+                            Full Question Statement:
+                          </span>
+                          <div className="p-3.5 rounded-lg bg-[var(--surface2-color)] border border-app-border dark:border-dark-border text-[var(--text-primary)] whitespace-pre-wrap leading-relaxed text-xs">
+                            {q.description || q.title}
+                          </div>
+                        </div>
+
+                        {/* MCQ Options Display */}
+                        {q.options && q.options.length > 0 && (
+                          <div>
+                            <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)] block mb-1.5">
+                              Options & Answer Key:
+                            </span>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                              {q.options.map((opt: any, optIdx: number) => {
+                                const letter = String.fromCharCode(65 + optIdx);
+                                return (
+                                  <div
+                                    key={opt.id || optIdx}
+                                    className={`p-2.5 rounded-lg border text-xs flex items-center justify-between gap-2 ${
+                                      opt.isCorrect
+                                        ? "bg-emerald-500/10 border-emerald-500/40 text-emerald-700 dark:text-emerald-300 font-medium"
+                                        : "bg-[var(--surface2-color)] border-app-border dark:border-dark-border text-[var(--text-primary)]"
+                                    }`}
+                                  >
+                                    <div className="flex items-center gap-2 min-w-0">
+                                      <span
+                                        className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${
+                                          opt.isCorrect
+                                            ? "bg-emerald-500 text-white"
+                                            : "bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300"
+                                        }`}
+                                      >
+                                        {letter}
+                                      </span>
+                                      <span className="break-words">{opt.text}</span>
+                                    </div>
+                                    {opt.isCorrect && (
+                                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500 text-white shrink-0">
+                                        ✓ Correct Answer
+                                      </span>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Starter Code Block */}
+                        {q.codeConfig?.starterCode && (
+                          <div>
+                            <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)] block mb-1">
+                              Starter Code ({q.codeConfig.language || "code"}):
+                            </span>
+                            <pre className="p-3 rounded-lg bg-slate-900 text-slate-100 text-xs overflow-x-auto font-mono leading-relaxed border border-slate-800">
+                              <code>{q.codeConfig.starterCode}</code>
+                            </pre>
+                          </div>
+                        )}
+
+                        {/* Text Answer */}
+                        {q.correctTextAnswer && (
+                          <div className="p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-300 text-xs">
+                            <span className="font-bold">Expected Answer: </span>
+                            <code>{q.correctTextAnswer}</code>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </Card>
+
+        {/* Proctoring & Security Configuration Settings Card */}
+        <Card className="space-y-4">
+          <h3 className="text-base font-bold text-[var(--text-primary)] border-b pb-2" style={{ borderColor: "var(--border-color)" }}>
+            Proctoring & System Rules
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+            <div className="p-3 rounded-lg border flex items-center justify-between" style={{ backgroundColor: "var(--surface2-color)", borderColor: "var(--border-color)" }}>
+              <span className="font-semibold text-[var(--text-primary)]">Fullscreen Mode Enforcement</span>
+              {test.proctoringConfig?.fullScreenRequired !== false ? (
+                <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/10 text-emerald-600 border border-emerald-500/20">✓ Required</span>
+              ) : (
+                <span className="px-2.5 py-0.5 rounded-full text-[11px] text-[var(--text-muted)] bg-slate-100 dark:bg-slate-800">Disabled</span>
+              )}
+            </div>
+
+            <div className="p-3 rounded-lg border flex items-center justify-between" style={{ backgroundColor: "var(--surface2-color)", borderColor: "var(--border-color)" }}>
+              <span className="font-semibold text-[var(--text-primary)]">Tab Switch Violation Limit</span>
+              <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-500/10 text-amber-600 border border-amber-500/20">
+                {test.proctoringConfig?.tabSwitchLimit || 3} Max Switches
+              </span>
+            </div>
+
+            <div className="p-3 rounded-lg border flex items-center justify-between" style={{ backgroundColor: "var(--surface2-color)", borderColor: "var(--border-color)" }}>
+              <span className="font-semibold text-[var(--text-primary)]">Copy / Paste Restriction</span>
+              {test.proctoringConfig?.disableCopyPaste !== false ? (
+                <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/10 text-emerald-600 border border-emerald-500/20">✓ Blocked</span>
+              ) : (
+                <span className="px-2.5 py-0.5 rounded-full text-[11px] text-[var(--text-muted)] bg-slate-100 dark:bg-slate-800">Allowed</span>
+              )}
+            </div>
+
+            <div className="p-3 rounded-lg border flex items-center justify-between" style={{ backgroundColor: "var(--surface2-color)", borderColor: "var(--border-color)" }}>
+              <span className="font-semibold text-[var(--text-primary)]">Right Click Restriction</span>
+              {test.proctoringConfig?.disableRightClick !== false ? (
+                <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/10 text-emerald-600 border border-emerald-500/20">✓ Blocked</span>
+              ) : (
+                <span className="px-2.5 py-0.5 rounded-full text-[11px] text-[var(--text-muted)] bg-slate-100 dark:bg-slate-800">Allowed</span>
+              )}
             </div>
           </div>
         </Card>
 
-        <Card>
-          <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-4">Proctoring Settings</h3>
-          <div className="flex flex-wrap gap-2">
-            {test.proctoringConfig?.fullScreenRequired && <Badge variant="neutral">Fullscreen Required</Badge>}
-            {test.proctoringConfig?.disableCopyPaste && <Badge variant="neutral">Copy/Paste Disabled</Badge>}
-            {test.proctoringConfig?.disableRightClick && <Badge variant="neutral">Right-Click Disabled</Badge>}
-            <Badge variant="neutral">Tab Switch Limit: {test.proctoringConfig?.tabSwitchLimit || 3}</Badge>
-          </div>
-        </Card>
-
-        <Modal open={editing} onClose={() => setEditing(false)} title="Edit Test">
+        {/* Quick Edit Title/Description Modal */}
+        <Modal open={editing} onClose={() => setEditing(false)} title="Quick Edit Assessment Info">
           <div className="space-y-4">
-            <Input label="Title" value={title} onChange={(e) => setTitle(e.target.value)} />
-            <Textarea label="Description" value={description} onChange={(e) => setDescription(e.target.value)} />
-            <div className="flex justify-end gap-3">
+            <Input label="Test Title *" value={title} onChange={(e) => setTitle(e.target.value)} />
+            <Textarea label="Description / Objective" value={description} onChange={(e) => setDescription(e.target.value)} rows={4} />
+            <div className="flex justify-end gap-3 pt-2">
               <Button variant="secondary" onClick={() => setEditing(false)}>Cancel</Button>
-              <Button onClick={handleSave} loading={saving}>Save Changes</Button>
+              <Button onClick={handleSave} loading={saving}>Save Info</Button>
             </div>
           </div>
         </Modal>
 
-        {/* ── Candidate Invite Modal with Custom Expiration ──────────────────── */}
+        {/* Candidate Invite Modal with Custom Expiration */}
         <Modal open={inviteModal} onClose={() => { setInviteModal(false); setInviteResults([]); }} title="Invite Candidates to Assessment" size="lg">
           {inviteResults.length > 0 ? (
             <div>
@@ -215,12 +573,10 @@ export default function TestDetailPage({ params }: { params: Promise<{ id: strin
             </div>
           ) : (
             <div className="space-y-4">
-              {/* Candidate Suggestions Section */}
               <div>
                 <label className="block text-sm font-medium text-[var(--text-primary)] mb-1.5">
                   Select Candidates from Database ({candidates.length} available)
                 </label>
-                
                 <Input
                   placeholder="Search candidate name or email..."
                   value={candidateSearch}
@@ -266,7 +622,6 @@ export default function TestDetailPage({ params }: { params: Promise<{ id: strin
                 rows={3}
               />
 
-              {/* Expiration Settings with Custom Option */}
               <div className="space-y-2">
                 <Select
                   label="Assessment Link Expiration Time"
