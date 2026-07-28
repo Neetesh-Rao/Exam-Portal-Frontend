@@ -179,7 +179,7 @@ export default function EditTestPage({ params }: { params: Promise<{ id: string 
             ) : (
               <div className="space-y-2 max-h-96 overflow-y-auto">
                 {questions.map((q) => {
-                  const qid = (q.id || q._id)?.toString();
+                  const qid = (q.id || q._id)?.toString() || "";
                   const isChecked = selectedQuestionIds.includes(qid);
                   return (
                     <label

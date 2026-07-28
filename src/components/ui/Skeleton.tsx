@@ -1,11 +1,11 @@
 "use client";
 
 // Base skeleton — uses CSS-variable-driven shimmer (auto adapts to dark/light)
-export default function Skeleton({ className = "" }: { className?: string }) {
+export default function Skeleton({ className = "", style }: { className?: string; style?: React.CSSProperties }) {
   return (
     <div
       className={`skeleton-shimmer ${className}`}
-      style={{ minHeight: "1rem" }}
+      style={{ minHeight: "1rem", ...style }}
     />
   );
 }

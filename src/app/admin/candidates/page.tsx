@@ -581,7 +581,7 @@ export default function CandidatesPage() {
             <div className="flex items-center justify-center">
               <div style={{
                 width: 56, height: 56, borderRadius: "50%",
-                background: "#fef2f2", display: "flex", items: "center", justifyContent: "center",
+                background: "#fef2f2", display: "flex", alignItems: "center", justifyContent: "center",
               }}>
                 <TrashIcon />
               </div>
