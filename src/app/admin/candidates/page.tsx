@@ -275,14 +275,14 @@ export default function CandidatesPage() {
               <table className="w-full min-w-[960px]">
                 <thead>
                   <tr style={{ borderBottom: "1px solid var(--border-color)" }}>
-                    {["Name", "Email", "Phone", "Resume", "Source", "Status", "Actions"].map((h, i) => (
+                    {["Name", "Email", "Phone", "Resume", "Source", "Actions"].map((h, i) => (
                       <th
                         key={h}
                         className="py-3 px-4 text-xs font-semibold uppercase tracking-wider"
                         style={{
-                          textAlign: i === 6 ? "right" : "left",
+                          textAlign: i === 5 ? "right" : "left",
                           color: "var(--text-muted)",
-                          minWidth: i === 6 ? "150px" : undefined,
+                          minWidth: i === 5 ? "150px" : undefined,
                         }}
                       >
                         {h}
@@ -346,8 +346,6 @@ export default function CandidatesPage() {
                         </td>
                         {/* Source */}
                         <td className="px-4 py-3.5">{c.source ? <Badge variant="neutral">{c.source}</Badge> : "—"}</td>
-                        {/* Status */}
-                        <td className="px-4 py-3.5">{getStatusBadge(c.status)}</td>
                         {/* Actions Column: Invite, View, Edit, Delete (Guaranteed Visible) */}
                         <td className="px-4 py-3.5">
                           <div className="flex items-center justify-end gap-1 min-w-[140px]">
