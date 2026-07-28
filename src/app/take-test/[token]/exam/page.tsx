@@ -383,25 +383,51 @@ export default function ExamPage({ params }: { params: Promise<{ token: string }
 
       if (cameraBlobsRef.current.length === 0 && screenBlobsRef.current.length === 0) return;
 
+      const cameraBlob = cameraBlobsRef.current.length > 0
+        ? new Blob(cameraBlobsRef.current, { type: "video/webm" })
+        : null;
+
+      const screenBlob = screenBlobsRef.current.length > 0
+        ? new Blob(screenBlobsRef.current, { type: "video/webm" })
+        : null;
+
       const formData = new FormData();
+      if (cameraBlob) formData.append("cameraVideo", cameraBlob, "camera_recording.webm");
+      if (screenBlob) formData.append("screenVideo", screenBlob, "screen_recording.webm");
 
-      if (cameraBlobsRef.current.length > 0) {
-        const cameraBlob = new Blob(cameraBlobsRef.current, { type: "video/webm" });
-        formData.append("cameraVideo", cameraBlob, "camera_recording.webm");
+      try {
+        const res = await fetch(`/api/submissions/${activeSubId}/upload-full-recordings`, {
+          method: "POST",
+          body: formData,
+        });
+        const resData = await res.json();
+        console.log("Cloudinary Upload Result:", resData);
+      } catch (err) {
+        console.warn("FormData upload failed, attempting Base64 fallback...", err);
+        // Base64 JSON Fallback
+        const cameraBase64 = cameraBlob ? await new Promise<string>((res) => {
+          const reader = new FileReader();
+          reader.onloadend = () => res(reader.result as string);
+          reader.readAsDataURL(cameraBlob);
+        }) : undefined;
+
+        const screenBase64 = screenBlob ? await new Promise<string>((res) => {
+          const reader = new FileReader();
+          reader.onloadend = () => res(reader.result as string);
+          reader.readAsDataURL(screenBlob);
+        }) : undefined;
+
+        if (cameraBase64 || screenBase64) {
+          await fetch(`/api/submissions/${activeSubId}/upload-full-recordings`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              cameraVideoBase64: cameraBase64,
+              screenVideoBase64: screenBase64,
+            }),
+          }).catch(() => {});
+        }
       }
-
-      if (screenBlobsRef.current.length > 0) {
-        const screenBlob = new Blob(screenBlobsRef.current, { type: "video/webm" });
-        formData.append("screenVideo", screenBlob, "screen_recording.webm");
-      }
-
-      const res = await fetch(`/api/submissions/${activeSubId}/upload-full-recordings`, {
-        method: "POST",
-        body: formData,
-      });
-
-      const resData = await res.json();
-      console.log("Cloudinary Upload Result:", resData);
     } catch (err) {
       console.warn("Upload recording error:", err);
     }
@@ -459,33 +485,48 @@ export default function ExamPage({ params }: { params: Promise<{ token: string }
   const isWarningTime = displayTime < 120;
 
   return (
-    <div className="min-h-screen bg-app-bg-subtle dark:bg-app-text flex">
+    <div
+      className="min-h-screen flex"
+      style={{
+        backgroundColor: "var(--bg-color)",
+        color: "var(--text-primary)",
+      }}
+    >
       {/* Sidebar */}
-      <div className="w-64 bg-white dark:bg-dark-surface border-r border-app-border dark:border-dark-border flex flex-col fixed left-0 top-0 h-screen">
+      <div
+        className="w-64 border-r flex flex-col fixed left-0 top-0 h-screen z-30"
+        style={{
+          backgroundColor: "var(--surface-color)",
+          borderColor: "var(--border-color)",
+        }}
+      >
         {/* Timer */}
-        <div className="p-4 border-b border-app-border dark:border-dark-border">
-          <p className="text-xs text-[var(--text-muted)] mb-1">Time Remaining</p>
-          <p className={`text-3xl font-bold tracking-tight ${isWarningTime ? "text-danger" : "text-[var(--text-primary)]"}`}>
+        <div className="p-4 border-b" style={{ borderColor: "var(--border-color)" }}>
+          <p className="text-xs mb-1" style={{ color: "var(--text-muted)" }}>Time Remaining</p>
+          <p className={`text-3xl font-bold tracking-tight ${isWarningTime ? "text-danger" : ""}`} style={{ color: isWarningTime ? undefined : "var(--text-primary)" }}>
             {formatTime(displayTime)}
           </p>
-          <div className="mt-2 h-1 bg-gray-200 dark:bg-gray-800 rounded-full overflow-hidden">
+          <div className="mt-2 h-1 rounded-full overflow-hidden" style={{ backgroundColor: "var(--border-color)" }}>
             <div
-              className={`h-full transition-all ${isWarningTime ? "bg-danger" : "bg-[var(--text-primary)]"}`}
-              style={{ width: `${(displayTime / totalTime) * 100}%` }}
+              className={`h-full transition-all ${isWarningTime ? "bg-danger" : ""}`}
+              style={{
+                width: `${(displayTime / totalTime) * 100}%`,
+                backgroundColor: isWarningTime ? undefined : "#0284c7",
+              }}
             />
           </div>
         </div>
 
         {/* Violations */}
-        <div className="p-4 border-b border-app-border dark:border-dark-border">
-          <p className="text-xs text-[var(--text-muted)] mb-1">Violations</p>
-          <p className={`text-lg font-bold ${violations > 0 ? "text-danger" : "text-[var(--text-primary)]"}`}>
+        <div className="p-4 border-b" style={{ borderColor: "var(--border-color)" }}>
+          <p className="text-xs mb-1" style={{ color: "var(--text-muted)" }}>Violations</p>
+          <p className={`text-lg font-bold ${violations > 0 ? "text-danger" : ""}`} style={{ color: violations > 0 ? undefined : "var(--text-primary)" }}>
             {violations} / {maxViolations}
           </p>
         </div>
 
         {/* Live Proctoring Webcam Feed Widget */}
-        <div className="p-3 border-b border-app-border dark:border-dark-border bg-neutral-950 text-white">
+        <div className="p-3 border-b bg-neutral-950 text-white" style={{ borderColor: "var(--border-color)" }}>
           <div className="flex items-center justify-between mb-1.5">
             <span className="text-[10px] font-bold tracking-wider uppercase flex items-center gap-1.5 text-emerald-400">
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
@@ -501,7 +542,7 @@ export default function ExamPage({ params }: { params: Promise<{ token: string }
 
         {/* Question Palette */}
         <div className="flex-1 p-4 overflow-y-auto">
-          <p className="text-xs text-[var(--text-muted)] mb-3">Questions</p>
+          <p className="text-xs mb-3" style={{ color: "var(--text-muted)" }}>Questions</p>
           <div className="grid grid-cols-5 gap-2">
             {questions.map((q, idx) => {
               const ans = answers.find((a) => a.questionId === q.id);
@@ -515,13 +556,22 @@ export default function ExamPage({ params }: { params: Promise<{ token: string }
                   onClick={() => setCurrentIdx(idx)}
                   className={`w-9 h-9 rounded-lg text-xs font-medium flex items-center justify-center border transition-colors cursor-pointer ${
                     isCurrent
-                      ? "bg-[var(--text-primary)] text-[var(--bg-color)] border-transparent"
+                      ? "bg-sky-600 text-white border-transparent shadow-sm"
                       : isMarked
-                      ? "bg-warn text-white border-transparent"
+                      ? "bg-amber-500 text-white border-transparent"
                       : hasAnswer
-                      ? "bg-success text-white border-transparent"
-                      : "bg-gray-100 dark:bg-dark-surface text-[var(--text-secondary)] border-app-border dark:border-dark-border"
+                      ? "bg-emerald-600 text-white border-transparent"
+                      : ""
                   }`}
+                  style={
+                    !isCurrent && !isMarked && !hasAnswer
+                      ? {
+                          backgroundColor: "var(--surface2-color)",
+                          color: "var(--text-secondary)",
+                          borderColor: "var(--border-color)",
+                        }
+                      : {}
+                  }
                 >
                   {idx + 1}
                 </button>
@@ -529,14 +579,14 @@ export default function ExamPage({ params }: { params: Promise<{ token: string }
             })}
           </div>
           <div className="mt-4 space-y-1.5 text-xs">
-            <div className="flex items-center gap-2"><div className="w-3 h-3 rounded bg-gray-100 dark:bg-dark-surface border border-app-border dark:border-dark-border" /><span className="text-[var(--text-muted)]">Not visited</span></div>
-            <div className="flex items-center gap-2"><div className="w-3 h-3 rounded bg-success" /><span className="text-[var(--text-muted)]">Answered</span></div>
-            <div className="flex items-center gap-2"><div className="w-3 h-3 rounded bg-warn" /><span className="text-[var(--text-muted)]">Marked for review</span></div>
+            <div className="flex items-center gap-2"><div className="w-3 h-3 rounded border" style={{ backgroundColor: "var(--surface2-color)", borderColor: "var(--border-color)" }} /><span style={{ color: "var(--text-muted)" }}>Not visited</span></div>
+            <div className="flex items-center gap-2"><div className="w-3 h-3 rounded bg-emerald-600" /><span style={{ color: "var(--text-muted)" }}>Answered</span></div>
+            <div className="flex items-center gap-2"><div className="w-3 h-3 rounded bg-amber-500" /><span style={{ color: "var(--text-muted)" }}>Marked for review</span></div>
           </div>
         </div>
 
         {/* Submit */}
-        <div className="p-4 border-t border-app-border dark:border-dark-border">
+        <div className="p-4 border-t" style={{ borderColor: "var(--border-color)" }}>
           <Button onClick={() => setShowConfirmSubmit(true)} className="w-full">Submit Test</Button>
         </div>
       </div>
@@ -548,8 +598,8 @@ export default function ExamPage({ params }: { params: Promise<{ token: string }
             {/* Question Header */}
             <div className="flex items-start justify-between mb-6">
               <div>
-                <p className="text-xs text-[var(--text-muted)] mb-1">Question {currentIdx + 1} of {questions.length}</p>
-                <h2 className="text-xl font-semibold text-[var(--text-primary)]">{currentQuestion.title}</h2>
+                <p className="text-xs mb-1" style={{ color: "var(--text-muted)" }}>Question {currentIdx + 1} of {questions.length}</p>
+                <h2 className="text-xl font-bold tracking-tight" style={{ color: "var(--text-primary)" }}>{currentQuestion.title}</h2>
               </div>
               <div className="flex items-center gap-2">
                 <Badge variant="neutral">{currentQuestion.marks} marks</Badge>
@@ -559,13 +609,19 @@ export default function ExamPage({ params }: { params: Promise<{ token: string }
 
             {/* Question Body */}
             {currentQuestion.description && (
-              <div className="prose prose-sm dark:prose-invert max-w-none mb-6 text-[var(--text-secondary)]">
+              <div className="prose prose-sm max-w-none mb-6 leading-relaxed" style={{ color: "var(--text-secondary)" }}>
                 <p>{currentQuestion.description}</p>
               </div>
             )}
 
             {/* Answer Area */}
-            <div className="bg-white dark:bg-dark-surface border border-app-border dark:border-dark-border rounded-xl p-6">
+            <div
+              className="rounded-xl p-6 border shadow-sm"
+              style={{
+                backgroundColor: "var(--surface-color)",
+                borderColor: "var(--border-color)",
+              }}
+            >
               {/* MCQ */}
               {["mcq_single", "mcq_multi", "true_false"].includes(currentQuestion.type) && (
                 <div className="space-y-3">
@@ -576,11 +632,12 @@ export default function ExamPage({ params }: { params: Promise<{ token: string }
                     return (
                       <label
                         key={opt.id}
-                        className={`flex items-center gap-3 p-4 rounded-lg border cursor-pointer transition-colors ${
-                          isSelected
-                            ? "border-accent bg-accent-subtle dark:bg-accent/10"
-                            : "border-app-border dark:border-dark-border hover:border-app-border-strong dark:hover:border-gray-700"
-                        }`}
+                        className="flex items-center gap-3 p-4 rounded-xl border cursor-pointer transition-all duration-150"
+                        style={{
+                          backgroundColor: isSelected ? "var(--surface2-color)" : "var(--surface-color)",
+                          borderColor: isSelected ? "#0284c7" : "var(--border-color)",
+                          boxShadow: isSelected ? "0 0 0 1px #0284c7" : "none",
+                        }}
                       >
                         <input
                           type={inputType}
@@ -595,14 +652,20 @@ export default function ExamPage({ params }: { params: Promise<{ token: string }
                               updateAnswer({ selectedOptionIds: [opt.id] });
                             }
                           }}
-                          className="accent-accent"
+                          className="w-4 h-4 accent-sky-600 cursor-pointer"
                         />
-                        <span className="text-sm text-[var(--text-primary)]">{opt.text}</span>
+                        <span
+                          className="text-sm font-medium leading-relaxed"
+                          style={{ color: "var(--text-primary)" }}
+                        >
+                          {opt.text}
+                        </span>
                       </label>
                     );
                   })}
                 </div>
               )}
+
 
               {/* Text Area */}
               {["text_area", "fill_blank"].includes(currentQuestion.type) && (

@@ -1,29 +1,56 @@
 "use client";
-
 import { useEffect, useState, use } from "react";
+import Link from "next/link";
 import AdminHeader from "@/components/layout/AdminHeader";
 import Card from "@/components/ui/Card";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
-import Input from "@/components/ui/Input";
-import { CardSkeleton } from "@/components/ui/Skeleton";
-import { ShieldAlert, Video, Award, Clock, CheckCircle2, User, Play, ChevronLeft, ChevronRight } from "lucide-react";
-import Link from "next/link";
 import CodeEditor from "@/components/editor/CodeEditor";
+import {
+  ChevronLeft,
+  ChevronRight,
+  ShieldAlert,
+  CheckCircle2,
+  AlertTriangle,
+  Clock,
+  Video,
+  FileText,
+  User,
+  Film,
+  Calendar,
+  Check,
+  X,
+  Code,
+  HelpCircle,
+} from "lucide-react";
+
+interface QuestionOption {
+  id: string;
+  text: string;
+  isCorrect?: boolean;
+}
 
 interface Question {
   id: string;
   title: string;
-  description: string;
+  description?: string;
   type: string;
   marks: number;
-  options: { id: string; text: string; isCorrect: boolean }[];
-  correctTextAnswer: string | null;
+  options?: QuestionOption[];
+  codeConfig?: { language?: string; starterCode?: string; disablePaste?: boolean };
+  fillBlankKeys?: string[];
 }
 
 interface RecordingSnapshot {
   timestamp: string;
   imageUrl: string;
+  event?: string;
+}
+
+interface RecordingHistoryItem {
+  type: "camera" | "screen" | "snapshot";
+  url: string;
+  timestamp: string;
   event?: string;
 }
 
@@ -37,10 +64,12 @@ interface SubmissionData {
     totalMarks: number;
     answers: { questionId: string; answerText?: string; selectedOptionIds?: string[]; codeAnswer?: string; isMarkedForReview?: boolean }[];
     recordingSnapshots?: RecordingSnapshot[];
+    recordingsHistory?: RecordingHistoryItem[];
     videoRecordingUrl?: string | null;
     screenRecordingUrl?: string | null;
     startedAt: string;
     submittedAt: string;
+    createdAt: string;
   };
   candidate: { id: string; name: string; email: string };
   test: { id: string; title: string };
@@ -56,6 +85,7 @@ export default function SubmissionDetailPage({ params }: { params: Promise<{ id:
   const [saving, setSaving] = useState(false);
   const [activeSnapshotIdx, setActiveSnapshotIdx] = useState<number>(0);
   const [isPlayingVideo, setIsPlayingVideo] = useState<boolean>(false);
+  const [selectedRecordStream, setSelectedRecordStream] = useState<string | null>(null);
 
   const getApiUrl = (path: string) => {
     const base = process.env.NEXT_PUBLIC_API_URL || "";
@@ -84,7 +114,7 @@ export default function SubmissionDetailPage({ params }: { params: Promise<{ id:
       .catch(() => setLoading(false));
   }, [id]);
 
-  // Video Playback Animation Timer
+  // Video Playback Animation Timer for Snapshots
   useEffect(() => {
     if (!isPlayingVideo) return;
 
@@ -98,7 +128,7 @@ export default function SubmissionDetailPage({ params }: { params: Promise<{ id:
         }
         return prevIdx + 1;
       });
-    }, 600); // 600ms per frame video animation
+    }, 600);
 
     return () => clearInterval(interval);
   }, [isPlayingVideo, data]);
@@ -118,7 +148,9 @@ export default function SubmissionDetailPage({ params }: { params: Promise<{ id:
   if (loading) return (
     <div>
       <AdminHeader title="Loading submission details..." />
-      <div className="p-8 max-w-5xl mx-auto"><CardSkeleton /></div>
+      <div className="p-8 max-w-5xl mx-auto text-center">
+        <div className="animate-spin w-8 h-8 border-2 border-sky-500 border-t-transparent rounded-full mx-auto" />
+      </div>
     </div>
   );
 
@@ -135,14 +167,49 @@ export default function SubmissionDetailPage({ params }: { params: Promise<{ id:
   const questions = data.questions || (submission as any)?.questions || [];
   const violations = data.violations || (submission as any)?.violations || [];
   const snapshots = submission?.recordingSnapshots || [];
+  const history = submission?.recordingsHistory || [];
   const currentSnapshot = snapshots[activeSnapshotIdx];
-  const cameraUrl = submission?.videoRecordingUrl || undefined;
-  const screenUrl = submission?.screenRecordingUrl || submission?.videoRecordingUrl || undefined;
+
+  const cameraUrl = selectedRecordStream || submission?.videoRecordingUrl || undefined;
+  const screenUrl = submission?.screenRecordingUrl || undefined;
+
+  // Build list of all historical recording sessions with date/time (deduplicated by URL)
+  const rawRecordings = [
+    ...(submission?.videoRecordingUrl ? [{
+      id: "cam_main",
+      type: "Camera Video",
+      url: submission.videoRecordingUrl,
+      timestamp: submission.submittedAt || submission.createdAt || new Date().toISOString(),
+      label: "Camera Video Stream",
+    }] : []),
+    ...(submission?.screenRecordingUrl ? [{
+      id: "screen_main",
+      type: "Screen Capture",
+      url: submission.screenRecordingUrl,
+      timestamp: submission.submittedAt || submission.createdAt || new Date().toISOString(),
+      label: "Screen Activity Video",
+    }] : []),
+    ...history.map((h, i) => ({
+      id: `hist_${i}`,
+      type: h.type === "camera" ? "Camera Stream" : h.type === "screen" ? "Screen Stream" : "Snapshot Frame",
+      url: h.url,
+      timestamp: h.timestamp || submission.createdAt,
+      label: h.event || `Recording Stream #${i + 1}`,
+    })),
+  ];
+
+  // Deduplicate by URL
+  const seenUrls = new Set<string>();
+  const allRecordings = rawRecordings.filter((rec) => {
+    if (!rec.url || seenUrls.has(rec.url)) return false;
+    seenUrls.add(rec.url);
+    return true;
+  });
 
   return (
     <div>
       <AdminHeader title={`Submission Review`} subtitle={`${candidate?.name || "Candidate"} • ${test?.title || "Assessment"}`} />
-      
+
       <div className="p-8 max-w-6xl mx-auto space-y-6">
         {/* Navigation */}
         <Link href="/admin/submissions" className="inline-flex items-center gap-1.5 text-xs font-semibold text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors">
@@ -159,27 +226,71 @@ export default function SubmissionDetailPage({ params }: { params: Promise<{ id:
             <p className="text-xs text-[var(--text-muted)]">{candidate?.email} • Assessment: {test?.title}</p>
           </div>
 
-          <div className="flex items-center gap-6 bg-app-bg-subtle dark:bg-dark-surface p-4 rounded-xl border border-app-border dark:border-dark-border">
+          <div className="flex items-center gap-6 p-4 rounded-xl border" style={{ backgroundColor: "var(--surface2-color)", borderColor: "var(--border-color)" }}>
             <div className="text-center">
-              <p className="text-xs text-[var(--text-muted)] uppercase tracking-wider font-semibold">Total Score</p>
-              <p className="text-2xl font-extrabold text-[var(--text-primary)]">{submission.finalScore ?? submission.autoScore ?? 0}</p>
+              <p className="text-xs uppercase tracking-wider font-semibold" style={{ color: "var(--text-muted)" }}>Total Score</p>
+              <p className="text-2xl font-extrabold" style={{ color: "var(--text-primary)" }}>{submission.finalScore ?? submission.autoScore ?? 0}</p>
             </div>
-            <div className="w-px h-8 bg-app-border dark:bg-dark-border"></div>
+            <div className="w-px h-8" style={{ backgroundColor: "var(--border-color)" }}></div>
             <div className="text-center">
-              <p className="text-xs text-[var(--text-muted)] uppercase tracking-wider font-semibold">Violations</p>
-              <p className={`text-2xl font-bold ${violations?.length > 0 ? "text-danger" : "text-[var(--text-primary)]"}`}>
+              <p className="text-xs uppercase tracking-wider font-semibold" style={{ color: "var(--text-muted)" }}>Violations</p>
+              <p className={`text-2xl font-bold ${violations?.length > 0 ? "text-danger" : ""}`} style={{ color: violations?.length > 0 ? undefined : "var(--text-primary)" }}>
                 {violations?.length || 0}
               </p>
             </div>
           </div>
         </Card>
 
+        {/* All Archived Test Recordings Timeline Selector */}
+        {allRecordings.length > 0 && (
+          <Card className="space-y-4">
+            <div className="flex items-center justify-between border-b pb-3" style={{ borderColor: "var(--border-color)" }}>
+              <h3 className="text-sm font-bold flex items-center gap-2" style={{ color: "var(--text-primary)" }}>
+                <Film className="w-4 h-4 text-sky-500" />
+                All Test Recordings & Stream Archive ({allRecordings.length} Streams Recorded)
+              </h3>
+              <span className="text-xs font-semibold" style={{ color: "var(--text-muted)" }}>
+                Date & Time Indexed
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+              {allRecordings.map((rec) => (
+                <button
+                  key={rec.id}
+                  onClick={() => setSelectedRecordStream(rec.url)}
+                  className="p-3 rounded-xl border text-left transition-all cursor-pointer flex items-start gap-3 hover:shadow-sm"
+                  style={{
+                    backgroundColor: selectedRecordStream === rec.url ? "var(--surface2-color)" : "var(--surface-color)",
+                    borderColor: selectedRecordStream === rec.url ? "#0284c7" : "var(--border-color)",
+                    boxShadow: selectedRecordStream === rec.url ? "0 0 0 1px #0284c7" : "none",
+                  }}
+                >
+                  <div className="w-8 h-8 rounded-lg bg-sky-500/10 text-sky-600 flex items-center justify-center flex-shrink-0 mt-0.5">
+                    <Video className="w-4 h-4" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-bold truncate" style={{ color: "var(--text-primary)" }}>{rec.label}</p>
+                    <p className="text-[11px] flex items-center gap-1 mt-0.5" style={{ color: "var(--text-muted)" }}>
+                      <Calendar className="w-3 h-3 text-sky-500" />
+                      {new Date(rec.timestamp).toLocaleString()}
+                    </p>
+                    <span className="inline-block mt-1.5 text-[10px] font-semibold px-2 py-0.5 rounded bg-sky-500/10 text-sky-600 border border-sky-500/20">
+                      {rec.type}
+                    </span>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </Card>
+        )}
+
         {/* Video Recordings Section (Camera & Screen Recording) */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Camera Video Player */}
           <Card className="space-y-3">
             <div className="flex items-center justify-between">
-              <h3 className="text-sm font-bold text-[var(--text-primary)] flex items-center gap-2">
+              <h3 className="text-sm font-bold flex items-center gap-2" style={{ color: "var(--text-primary)" }}>
                 <Video className="w-4 h-4 text-emerald-500" />
                 Camera & Audio Recording Stream
               </h3>
@@ -200,7 +311,7 @@ export default function SubmissionDetailPage({ params }: { params: Promise<{ id:
           {/* Screen Recording Video Player */}
           <Card className="space-y-3">
             <div className="flex items-center justify-between">
-              <h3 className="text-sm font-bold text-[var(--text-primary)] flex items-center gap-2">
+              <h3 className="text-sm font-bold flex items-center gap-2" style={{ color: "var(--text-primary)" }}>
                 <Video className="w-4 h-4 text-blue-500" />
                 Candidate Screen & Activity Video
               </h3>
@@ -221,16 +332,16 @@ export default function SubmissionDetailPage({ params }: { params: Promise<{ id:
 
         {/* Live Video / Screen Proctoring Snapshots Recording Player */}
         <Card className="space-y-4">
-          <div className="flex items-center justify-between border-b border-app-border dark:border-dark-border pb-3">
-            <h3 className="text-base font-bold text-[var(--text-primary)] flex items-center gap-2">
-              <Video className="w-4 h-4 text-accent" />
+          <div className="flex items-center justify-between border-b pb-3" style={{ borderColor: "var(--border-color)" }}>
+            <h3 className="text-base font-bold flex items-center gap-2" style={{ color: "var(--text-primary)" }}>
+              <Video className="w-4 h-4 text-sky-500" />
               Proctoring Video Stream Timeline & Playback
             </h3>
-            <span className="text-xs text-[var(--text-muted)] font-semibold">{snapshots.length} Recording Frames</span>
+            <span className="text-xs font-semibold" style={{ color: "var(--text-muted)" }}>{snapshots.length} Recording Frames</span>
           </div>
 
           {snapshots.length === 0 ? (
-            <div className="p-8 text-center bg-app-bg-subtle dark:bg-dark-surface rounded-xl border border-app-border dark:border-dark-border text-xs text-[var(--text-muted)]">
+            <div className="p-8 text-center rounded-xl border text-xs" style={{ backgroundColor: "var(--surface2-color)", borderColor: "var(--border-color)", color: "var(--text-muted)" }}>
               No webcam snapshots recorded for this test session yet. Camera recording captures frames periodically during exam execution.
             </div>
           ) : (
@@ -258,19 +369,19 @@ export default function SubmissionDetailPage({ params }: { params: Promise<{ id:
                     <span>{currentSnapshot?.imageUrl?.startsWith("data:video") ? "Video Stream Chunk" : "Camera Frame"} {activeSnapshotIdx + 1} / {snapshots.length}</span>
                   </div>
                   <div className="absolute bottom-3 left-3 right-3 bg-black/80 backdrop-blur text-neutral-300 text-xs px-3 py-1.5 rounded-lg flex items-center justify-between">
-                    <span>Captured: {currentSnapshot ? new Date(currentSnapshot.timestamp).toLocaleTimeString() : "—"}</span>
+                    <span>Captured: {currentSnapshot ? new Date(currentSnapshot.timestamp).toLocaleString() : "—"}</span>
                     <span className="capitalize font-medium text-emerald-400">{currentSnapshot?.event || "Camera Snapshot"}</span>
                   </div>
                 </div>
 
                 {/* Playback Navigation & Video Control Bar */}
-                <div className="space-y-2 bg-app-bg-subtle dark:bg-dark-surface p-3 rounded-xl border border-app-border dark:border-dark-border">
+                <div className="space-y-2 p-3 rounded-xl border" style={{ backgroundColor: "var(--surface2-color)", borderColor: "var(--border-color)" }}>
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex items-center gap-2">
                       <Button
                         size="sm"
                         onClick={() => setIsPlayingVideo(!isPlayingVideo)}
-                        className="bg-black text-white dark:bg-white dark:text-black font-semibold text-xs px-4"
+                        className="bg-sky-600 text-white font-semibold text-xs px-4"
                       >
                         {isPlayingVideo ? "⏸ Pause Video" : "▶ Play Video Recording"}
                       </Button>
@@ -300,132 +411,220 @@ export default function SubmissionDetailPage({ params }: { params: Promise<{ id:
                       </Button>
                     </div>
 
-                    <span className="text-xs text-[var(--text-muted)] font-mono font-semibold">
+                    <span className="text-xs font-mono font-semibold" style={{ color: "var(--text-muted)" }}>
                       Frame {activeSnapshotIdx + 1} of {snapshots.length}
                     </span>
                   </div>
 
-                  {/* Interactive Video Playback Slider */}
-                  {snapshots.length > 1 && (
-                    <div className="flex items-center gap-2 pt-1">
-                      <input
-                        type="range"
-                        min={0}
-                        max={snapshots.length - 1}
-                        value={activeSnapshotIdx}
-                        onChange={(e) => {
-                          setIsPlayingVideo(false);
-                          setActiveSnapshotIdx(Number(e.target.value));
-                        }}
-                        className="w-full accent-black dark:accent-white cursor-pointer h-1.5 bg-neutral-300 dark:bg-neutral-800 rounded-lg"
-                      />
-                    </div>
-                  )}
+                  {/* Seek Bar */}
+                  <input
+                    type="range"
+                    min="0"
+                    max={Math.max(0, snapshots.length - 1)}
+                    value={activeSnapshotIdx}
+                    onChange={(e) => {
+                      setIsPlayingVideo(false);
+                      setActiveSnapshotIdx(Number(e.target.value));
+                    }}
+                    className="w-full h-1.5 bg-gray-300 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer accent-sky-600"
+                  />
                 </div>
               </div>
 
-              {/* Snapshot Thumbnails Reel */}
-              <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
-                <p className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider">Stream Timeline Reel</p>
-                <div className="grid grid-cols-2 gap-2">
-                  {snapshots.map((snap, idx) => (
-                    <button
-                      key={idx}
-                      onClick={() => setActiveSnapshotIdx(idx)}
-                      className={`relative rounded-lg overflow-hidden border aspect-video transition-all cursor-pointer ${
-                        activeSnapshotIdx === idx ? "border-accent ring-2 ring-accent/30" : "border-app-border dark:border-dark-border opacity-70 hover:opacity-100"
-                      }`}
-                    >
-                      <img src={snap.imageUrl} alt={`Thumbnail ${idx}`} className="w-full h-full object-cover" />
-                      <span className="absolute bottom-1 right-1 text-[10px] bg-black/70 text-white px-1 rounded font-mono">
-                        #{idx + 1}
-                      </span>
-                    </button>
-                  ))}
-                </div>
+              {/* Snapshot Timeline Frame Thumbnails List */}
+              <div className="space-y-2 max-h-[380px] overflow-y-auto pr-1">
+                <p className="text-xs font-bold uppercase tracking-wider sticky top-0 py-1" style={{ backgroundColor: "var(--surface-color)", color: "var(--text-muted)" }}>
+                  Captured Frame Archive
+                </p>
+                {snapshots.map((snap, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => {
+                      setIsPlayingVideo(false);
+                      setActiveSnapshotIdx(idx);
+                    }}
+                    className="w-full p-2 rounded-lg border text-left flex items-center gap-3 transition-all cursor-pointer hover:border-sky-500"
+                    style={{
+                      backgroundColor: idx === activeSnapshotIdx ? "var(--surface2-color)" : "var(--surface-color)",
+                      borderColor: idx === activeSnapshotIdx ? "#0284c7" : "var(--border-color)",
+                      boxShadow: idx === activeSnapshotIdx ? "0 0 0 1px #0284c7" : "none",
+                    }}
+                  >
+                    <div className="w-12 h-9 rounded bg-black overflow-hidden flex-shrink-0 relative border border-neutral-800">
+                      {snap.imageUrl?.startsWith("data:video") ? (
+                        <div className="w-full h-full flex items-center justify-center bg-emerald-950 text-[9px] font-bold text-emerald-400">
+                          VIDEO
+                        </div>
+                      ) : (
+                        <img src={snap.imageUrl} alt="Thumb" className="w-full h-full object-cover" />
+                      )}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs font-medium truncate" style={{ color: "var(--text-primary)" }}>
+                        {snap.event || "Camera Frame"} #{idx + 1}
+                      </p>
+                      <p className="text-[10px]" style={{ color: "var(--text-muted)" }}>
+                        {new Date(snap.timestamp).toLocaleTimeString()}
+                      </p>
+                    </div>
+                  </button>
+                ))}
               </div>
             </div>
           )}
         </Card>
 
-        {/* Proctoring Violation Log Timeline */}
-        {violations && violations.length > 0 && (
-          <Card className="space-y-3">
-            <h3 className="text-base font-bold text-[var(--text-primary)] flex items-center gap-2">
-              <ShieldAlert className="w-4 h-4 text-danger" />
-              Itemized Proctoring Violation Events
+        {/* Candidate Questions & Answers Evaluation Section */}
+        <Card className="space-y-6">
+          <div className="flex items-center justify-between border-b pb-3" style={{ borderColor: "var(--border-color)" }}>
+            <h3 className="text-base font-bold flex items-center gap-2" style={{ color: "var(--text-primary)" }}>
+              <HelpCircle className="w-5 h-5 text-sky-500" />
+              Candidate Submitted Answers & Test Evaluation ({questions.length} Questions)
             </h3>
-            <div className="space-y-2">
-              {violations.map((v) => (
-                <div key={v.id} className="flex items-center justify-between p-3 bg-red-500/10 rounded-lg border border-red-500/20 text-xs">
-                  <Badge variant="danger">{v.type?.replace(/_/g, " ").toUpperCase()}</Badge>
-                  <span className="text-[var(--text-muted)] font-mono">{new Date(v.createdAt).toLocaleString()}</span>
-                </div>
-              ))}
-            </div>
-          </Card>
-        )}
+            <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-sky-500/10 text-sky-600 border border-sky-500/20">
+              Detailed Question Review
+            </span>
+          </div>
 
-        {/* Candidate Question Answers */}
-        <Card className="space-y-4">
-          <h3 className="text-base font-bold text-[var(--text-primary)]">Submitted Question Responses</h3>
-          {(!questions || questions.length === 0) ? (
-            <p className="text-xs text-[var(--text-muted)] italic">No questions found for this assessment.</p>
+          {questions.length === 0 ? (
+            <p className="text-xs py-4 text-center" style={{ color: "var(--text-muted)" }}>
+              No question details attached to this submission.
+            </p>
           ) : (
             <div className="space-y-6">
               {questions.map((q, idx) => {
-                const answer = submission.answers?.find((a) => a.questionId?.toString() === q.id?.toString());
+                const ans = submission.answers?.find(
+                  (a) => a.questionId?.toString() === q.id || (a.questionId as any)?._id?.toString() === q.id
+                );
 
                 return (
-                  <div key={q.id || idx} className="p-5 border border-app-border dark:border-dark-border rounded-xl space-y-3 bg-app-bg-subtle/50 dark:bg-dark-surface/50">
-                    <div className="flex items-start justify-between">
+                  <div
+                    key={q.id || idx}
+                    className="p-5 rounded-xl border space-y-4"
+                    style={{
+                      backgroundColor: "var(--surface2-color)",
+                      borderColor: "var(--border-color)",
+                    }}
+                  >
+                    {/* Question Header */}
+                    <div className="flex items-start justify-between gap-4">
                       <div>
-                        <p className="text-sm font-semibold text-[var(--text-primary)]">Q{idx + 1}. {q.title}</p>
-                        {q.description && <p className="text-xs text-[var(--text-muted)] mt-1">{q.description}</p>}
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-xs font-bold px-2 py-0.5 rounded bg-sky-500/10 text-sky-600 border border-sky-500/20">
+                            Q{idx + 1}
+                          </span>
+                          <span className="text-xs font-mono font-semibold uppercase" style={{ color: "var(--text-muted)" }}>
+                            {q.type.replace(/_/g, " ")}
+                          </span>
+                        </div>
+                        <h4 className="text-base font-bold" style={{ color: "var(--text-primary)" }}>
+                          {q.title}
+                        </h4>
                       </div>
                       <Badge variant="neutral">{q.marks} Marks</Badge>
                     </div>
 
-                    {/* MCQ Responses */}
-                    {["mcq_single", "mcq_multi", "true_false"].includes(q.type) && q.options && (
+                    {/* Question Description */}
+                    {q.description && (
+                      <p className="text-xs leading-relaxed" style={{ color: "var(--text-secondary)" }}>
+                        {q.description}
+                      </p>
+                    )}
+
+                    {/* MCQ Options Rendering */}
+                    {["mcq_single", "mcq_multi", "true_false"].includes(q.type) && (
                       <div className="space-y-2 pt-2">
-                        {q.options.map((opt) => {
-                          const isSelected = answer?.selectedOptionIds?.includes(opt.id);
+                        <p className="text-xs font-bold uppercase tracking-wider mb-2" style={{ color: "var(--text-muted)" }}>
+                          Options & Candidate Choices:
+                        </p>
+                        {q.options?.map((opt) => {
+                          const isSelected = ans?.selectedOptionIds?.includes(opt.id);
+                          const isCorrect = opt.isCorrect;
+
                           return (
                             <div
                               key={opt.id}
-                              className={`p-3 rounded-lg text-xs font-medium border flex items-center justify-between ${
-                                opt.isCorrect
-                                  ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30"
-                                  : isSelected
-                                  ? "bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/30"
-                                  : "bg-white dark:bg-dark-surface border-app-border dark:border-dark-border text-[var(--text-secondary)]"
-                              }`}
+                              className="p-3 rounded-lg border flex items-center justify-between text-xs"
+                              style={{
+                                backgroundColor: isSelected
+                                  ? isCorrect
+                                    ? "#ecfdf5"
+                                    : "#fef2f2"
+                                  : "var(--surface-color)",
+                                borderColor: isSelected
+                                  ? isCorrect
+                                    ? "#10b981"
+                                    : "#ef4444"
+                                  : "var(--border-color)",
+                              }}
                             >
-                              <span>{opt.text}</span>
-                              <span>{opt.isCorrect ? "✓ Correct Answer" : isSelected ? "Candidate Selected" : ""}</span>
+                              <div className="flex items-center gap-3">
+                                <span className="font-semibold" style={{ color: "var(--text-primary)" }}>
+                                  {opt.text}
+                                </span>
+                              </div>
+
+                              <div className="flex items-center gap-2">
+                                {isSelected && (
+                                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-sky-500/10 text-sky-600 border border-sky-500/20 flex items-center gap-1">
+                                    <Check className="w-3 h-3" /> Candidate Selected
+                                  </span>
+                                )}
+                                {isCorrect && (
+                                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 flex items-center gap-1">
+                                    <CheckCircle2 className="w-3 h-3" /> Correct Answer
+                                  </span>
+                                )}
+                              </div>
                             </div>
                           );
                         })}
                       </div>
                     )}
 
-                    {/* Text / Subjective Answers */}
+                    {/* Text Answer / Fill In The Blanks */}
                     {["text_area", "fill_blank"].includes(q.type) && (
-                      <div className="p-4 bg-white dark:bg-dark-surface rounded-lg border border-app-border dark:border-dark-border text-xs text-[var(--text-primary)] whitespace-pre-wrap">
-                        {answer?.answerText || <em className="text-[var(--text-muted)]">No text response submitted.</em>}
+                      <div className="space-y-2 pt-2">
+                        <p className="text-xs font-bold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>
+                          Candidate Submitted Response:
+                        </p>
+                        <div
+                          className="p-3.5 rounded-lg border text-sm font-medium leading-relaxed"
+                          style={{
+                            backgroundColor: "var(--surface-color)",
+                            borderColor: "var(--border-color)",
+                            color: "var(--text-primary)",
+                          }}
+                        >
+                          {ans?.answerText || "No answer submitted by candidate."}
+                        </div>
+                        {q.fillBlankKeys && q.fillBlankKeys.length > 0 && (
+                          <p className="text-xs text-emerald-600 font-medium">
+                            ✓ Expected Answer Key: {q.fillBlankKeys.join(", ")}
+                          </p>
+                        )}
                       </div>
                     )}
 
-                    {/* Monaco Code Editor Answer Snapshot */}
+                    {/* Monaco Coding Questions */}
                     {q.type === "coding" && (
-                      <div className="pt-2">
+                      <div className="space-y-3 pt-2">
+                        <div className="flex items-center justify-between">
+                          <p className="text-xs font-bold uppercase tracking-wider flex items-center gap-1.5" style={{ color: "var(--text-muted)" }}>
+                            <Code className="w-4 h-4 text-sky-500" />
+                            Candidate Submitted Monaco Code Solution:
+                          </p>
+                          <span className="text-xs font-mono font-semibold px-2 py-0.5 rounded bg-sky-500/10 text-sky-600 border border-sky-500/20">
+                            Language: {q.codeConfig?.language || "javascript"}
+                          </span>
+                        </div>
+
                         <CodeEditor
-                          value={answer?.codeAnswer || "// No code submitted"}
+                          value={ans?.codeAnswer || q.codeConfig?.starterCode || "// No code written by candidate"}
                           onChange={() => {}}
-                          language="javascript"
+                          language={q.codeConfig?.language || "javascript"}
                           readOnly={true}
-                          height="260px"
+                          height="320px"
                         />
                       </div>
                     )}
@@ -436,20 +635,57 @@ export default function SubmissionDetailPage({ params }: { params: Promise<{ id:
           )}
         </Card>
 
-        {/* Manual Scoring Section */}
+        {/* Proctoring Violation Logs */}
+        <Card className="space-y-3">
+          <h3 className="text-sm font-bold flex items-center gap-2" style={{ color: "var(--text-primary)" }}>
+            <ShieldAlert className="w-4 h-4 text-amber-500" />
+            Proctoring & System Violation Log
+          </h3>
+          {violations.length === 0 ? (
+            <p className="text-xs py-2 text-emerald-600 flex items-center gap-1.5">
+              <CheckCircle2 className="w-4 h-4" /> No proctoring violations recorded for this candidate submission.
+            </p>
+          ) : (
+            <div className="space-y-2">
+              {violations.map((v) => (
+                <div key={v.id} className="p-3 rounded-lg border flex items-center justify-between text-xs" style={{ backgroundColor: "var(--surface2-color)", borderColor: "var(--border-color)" }}>
+                  <div className="flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4 text-amber-500" />
+                    <span className="font-semibold capitalize" style={{ color: "var(--text-primary)" }}>{v.type.replace("_", " ")}</span>
+                  </div>
+                  <span style={{ color: "var(--text-muted)" }}>{new Date(v.createdAt).toLocaleString()}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </Card>
+
+        {/* Manual Grading Card */}
         <Card className="space-y-4">
-          <h3 className="text-base font-bold text-[var(--text-primary)]">Manual Marks & Evaluation</h3>
-          <div className="flex flex-col sm:flex-row items-end gap-4">
-            <Input
-              label="Additional Manual Marks"
-              type="number"
-              value={manualScore}
-              onChange={(e) => setManualScore(Number(e.target.value) || 0)}
-              className="max-w-xs"
-            />
-            <Button onClick={handleGrade} loading={saving}>
-              Save Evaluation & Finalize Marks
-            </Button>
+          <h3 className="text-sm font-bold flex items-center gap-2" style={{ color: "var(--text-primary)" }}>
+            <FileText className="w-4 h-4 text-sky-500" />
+            Manual Score & Evaluation
+          </h3>
+          <div className="flex items-center gap-4">
+            <div className="w-48">
+              <label className="text-xs font-semibold mb-1 block" style={{ color: "var(--text-muted)" }}>Manual Bonus / Adjustment Marks</label>
+              <input
+                type="number"
+                value={manualScore}
+                onChange={(e) => setManualScore(Number(e.target.value))}
+                className="w-full p-2.5 rounded-lg border text-sm outline-none focus:border-sky-500"
+                style={{
+                  backgroundColor: "var(--surface2-color)",
+                  borderColor: "var(--border-color)",
+                  color: "var(--text-primary)",
+                }}
+              />
+            </div>
+            <div className="pt-5">
+              <Button onClick={handleGrade} disabled={saving}>
+                {saving ? "Saving Grade..." : "Save Grade & Finalize"}
+              </Button>
+            </div>
           </div>
         </Card>
       </div>
