@@ -406,9 +406,9 @@ export default function ExamPage({ params }: { params: Promise<{ token: string }
         </div>
       )}
 
-      {/* Mobile Top Header (Timer & Proctoring Status) */}
+      {/* Mobile Top Header (Timer & Proctoring Status - Fixed at Top) */}
       <div
-        className={`lg:hidden fixed left-0 right-0 z-30 h-14 border-b px-4 flex items-center justify-between shadow-xs transition-all ${
+        className={`lg:hidden fixed left-0 right-0 z-40 h-14 border-b px-4 flex items-center justify-between shadow-sm backdrop-blur-md transition-all ${
           !isFullscreenMode && proctoringConfig.fullScreenRequired && !testEnded ? "top-11 sm:top-10" : "top-0"
         }`}
         style={{

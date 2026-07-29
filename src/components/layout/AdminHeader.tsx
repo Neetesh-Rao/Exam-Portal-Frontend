@@ -28,7 +28,7 @@ export default function AdminHeader({ title, subtitle, onMenuClick }: AdminHeade
 
   return (
     <header
-      className="h-16 flex items-center justify-between px-4 sm:px-8 shrink-0"
+      className="sticky top-0 z-30 h-16 flex items-center justify-between px-4 sm:px-8 shrink-0 backdrop-blur-md shadow-xs"
       style={{
         backgroundColor: "var(--surface-color)",
         borderBottom: "1px solid var(--border-color)",
