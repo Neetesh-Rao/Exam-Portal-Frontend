@@ -473,21 +473,6 @@ export default function ExamPage({ params }: { params: Promise<{ token: string }
           </div>
         </div>
 
-        {/* Live Proctoring Webcam Feed */}
-        <div className="p-3 border-b bg-neutral-950 text-white" style={{ borderColor: "var(--border-color)" }}>
-          <div className="flex items-center justify-between mb-1.5">
-            <span className="text-[10px] font-bold tracking-wider uppercase flex items-center gap-1.5 text-emerald-400">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
-              Live Camera Feed
-            </span>
-            <span className="text-[10px] text-neutral-400">Periodic Snapshots</span>
-          </div>
-          <div className="relative rounded-lg overflow-hidden bg-black aspect-video border border-neutral-800 flex items-center justify-center">
-            <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
-            <canvas ref={canvasRef} className="hidden" />
-          </div>
-        </div>
-
         {/* Question Palette */}
         <div className="flex-1 p-4 overflow-y-auto">
           <p className="text-xs mb-3 font-semibold" style={{ color: "var(--text-muted)" }}>Question Navigator</p>

@@ -40,6 +40,7 @@ interface Question {
   options?: QuestionOption[];
   codeConfig?: { language?: string; starterCode?: string; disablePaste?: boolean };
   fillBlankKeys?: string[];
+  correctTextAnswer?: string;
 }
 
 interface RecordingSnapshot {
@@ -532,28 +533,70 @@ export default function SubmissionDetailPage({ params }: { params: Promise<{ id:
                     )}
 
                     {/* Text Answer / Fill In The Blanks */}
-                    {["text_area", "fill_blank"].includes(q.type) && (
-                      <div className="space-y-2 pt-2">
-                        <p className="text-xs font-bold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>
-                          Candidate Submitted Response:
-                        </p>
-                        <div
-                          className="p-3.5 rounded-lg border text-sm font-medium leading-relaxed"
-                          style={{
-                            backgroundColor: "var(--surface-color)",
-                            borderColor: "var(--border-color)",
-                            color: "var(--text-primary)",
-                          }}
-                        >
-                          {ans?.answerText || "No answer submitted by candidate."}
+                    {["text_area", "fill_blank"].includes(q.type) && (() => {
+                      const candidateText = (ans?.answerText || "").trim();
+                      const correctAnswer = (q.correctTextAnswer || "").trim();
+
+                      // Determine evaluation result
+                      let evalResult: "correct" | "wrong" | "partial" | "ungraded" = "ungraded";
+                      if (correctAnswer && candidateText) {
+                        if (q.type === "fill_blank") {
+                          evalResult = candidateText.toLowerCase() === correctAnswer.toLowerCase() ? "correct" : "wrong";
+                        } else {
+                          // text_area: keyword match
+                          const keywords = correctAnswer.toLowerCase().split(/[,;\n]+/).map((k: string) => k.trim()).filter(Boolean);
+                          const matchCount = keywords.filter((kw: string) => candidateText.toLowerCase().includes(kw)).length;
+                          const ratio = keywords.length > 0 ? matchCount / keywords.length : 0;
+                          evalResult = ratio >= 0.5 ? "correct" : ratio > 0 ? "partial" : "wrong";
+                        }
+                      } else if (!candidateText) {
+                        evalResult = "wrong";
+                      }
+
+                      const evalStyles = {
+                        correct: { bg: "#ecfdf5", border: "#10b981", labelBg: "bg-emerald-500/10", labelText: "text-emerald-700", labelBorder: "border-emerald-500/20", icon: <CheckCircle2 className="w-3.5 h-3.5" />, label: "✓ Correct" },
+                        partial: { bg: "#fffbeb", border: "#f59e0b", labelBg: "bg-amber-500/10", labelText: "text-amber-700", labelBorder: "border-amber-500/20", icon: <Check className="w-3.5 h-3.5" />, label: "~ Partial" },
+                        wrong:   { bg: "#fef2f2", border: "#ef4444", labelBg: "bg-red-500/10", labelText: "text-red-700", labelBorder: "border-red-500/20", icon: <X className="w-3.5 h-3.5" />, label: "✗ Incorrect" },
+                        ungraded:{ bg: "var(--surface-color)", border: "var(--border-color)", labelBg: "bg-slate-500/10", labelText: "text-slate-600", labelBorder: "border-slate-500/20", icon: <HelpCircle className="w-3.5 h-3.5" />, label: "Awaiting Review" },
+                      };
+                      const style = evalStyles[evalResult];
+
+                      return (
+                        <div className="space-y-2 pt-2">
+                          <div className="flex items-center justify-between">
+                            <p className="text-xs font-bold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>
+                              Candidate Submitted Response:
+                            </p>
+                            {/* Correct / Wrong badge */}
+                            <span className={`flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full border ${style.labelBg} ${style.labelText} ${style.labelBorder}`}>
+                              {style.icon}
+                              {style.label}
+                            </span>
+                          </div>
+                          <div
+                            className="p-3.5 rounded-lg border text-sm font-medium leading-relaxed transition-colors"
+                            style={{
+                              backgroundColor: style.bg,
+                              borderColor: style.border,
+                              color: "var(--text-primary)",
+                            }}
+                          >
+                            {candidateText || <span className="italic text-[var(--text-muted)]">No answer submitted by candidate.</span>}
+                          </div>
+                          {correctAnswer && (
+                            <div className="flex items-start gap-2 p-2.5 rounded-lg bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20">
+                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 mt-0.5 shrink-0" />
+                              <div>
+                                <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400 mb-0.5">
+                                  {q.type === "fill_blank" ? "Expected Answer" : "Keywords / Expected Concepts"}
+                                </p>
+                                <p className="text-xs text-emerald-800 dark:text-emerald-300 font-medium">{correctAnswer}</p>
+                              </div>
+                            </div>
+                          )}
                         </div>
-                        {q.fillBlankKeys && q.fillBlankKeys.length > 0 && (
-                          <p className="text-xs text-emerald-600 font-medium">
-                            ✓ Expected Answer Key: {q.fillBlankKeys.join(", ")}
-                          </p>
-                        )}
-                      </div>
-                    )}
+                      );
+                    })()}
 
                     {/* Monaco Coding Questions */}
                     {q.type === "coding" && (
