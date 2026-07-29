@@ -44,6 +44,7 @@ export default function CategoryQuestionPicker({
   onSelectAllCategory,
 }: CategoryQuestionPickerProps) {
   const [categoryFilter, setCategoryFilter] = useState("All");
+  const [typeFilter, setTypeFilter] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
   const [expandedIds, setExpandedIds] = useState<Record<string, boolean>>({});
   const [modalQuestion, setModalQuestion] = useState<Question | null>(null);
@@ -76,12 +77,63 @@ export default function CategoryQuestionPicker({
     return <Badge variant={map[d] || "neutral"}>{d}</Badge>;
   };
 
-  // Categories list
-  const categoriesList = Array.from(new Set(["All", ...questions.map((q) => q.category || "General")]));
+  const typeBadge = (t: string) => {
+    const map: Record<string, { label: string; cls: string }> = {
+      coding: { label: "💻 Coding", cls: "bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20" },
+      mcq_single: { label: "🔘 MCQ (Single)", cls: "bg-sky-500/10 text-sky-600 dark:text-sky-400 border-sky-500/20" },
+      mcq_multi: { label: "☑️ MCQ (Multi)", cls: "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/20" },
+      text_area: { label: "📝 Text / Essay", cls: "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20" },
+      fill_blank: { label: "✏️ Fill Blanks", cls: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20" },
+      true_false: { label: "⚖️ True / False", cls: "bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border-cyan-500/20" },
+    };
+    const info = map[t] || { label: t.replace("_", " "), cls: "bg-slate-500/10 text-slate-600 border-slate-500/20" };
+    return (
+      <span className={`px-2 py-0.5 rounded-full text-xs font-bold border ${info.cls}`}>
+        {info.label}
+      </span>
+    );
+  };
 
-  // Filtered questions based on Category & Search Query
+  // Category counts list
+  const categoryCounts = questions.reduce<Record<string, number>>((acc, q) => {
+    const cat = q.category || "General";
+    acc[cat] = (acc[cat] || 0) + 1;
+    return acc;
+  }, {});
+
+  const categoriesList = ["All", ...Object.keys(categoryCounts).sort()];
+
+  // Questions filtered by active Category (to calculate Question Type breakdown for that Category)
+  const categoryFilteredQuestions = questions.filter((q) => {
+    if (categoryFilter !== "All" && (q.category || "General") !== categoryFilter) {
+      return false;
+    }
+    return true;
+  });
+
+  // Question Type counts for active Category
+  const typeCounts = categoryFilteredQuestions.reduce<Record<string, number>>((acc, q) => {
+    const t = q.type || "mcq_single";
+    acc[t] = (acc[t] || 0) + 1;
+    return acc;
+  }, {});
+
+  const typeLabels: Record<string, string> = {
+    All: "All Question Types",
+    coding: "💻 Coding / Code Editor",
+    mcq_single: "🔘 MCQ Single Choice",
+    mcq_multi: "☑️ MCQ Multiple Choice",
+    text_area: "📝 Text Area / Descriptive",
+    fill_blank: "✏️ Fill in the Blanks",
+    true_false: "⚖️ True / False",
+  };
+
+  // Filtered questions based on Category, Question Type & Search Query
   const filteredQuestions = questions.filter((q) => {
     if (categoryFilter !== "All" && (q.category || "General") !== categoryFilter) {
+      return false;
+    }
+    if (typeFilter !== "All" && (q.type || "mcq_single") !== typeFilter) {
       return false;
     }
     if (searchQuery.trim()) {
@@ -105,52 +157,157 @@ export default function CategoryQuestionPicker({
 
   const isAllExpanded = questions.length > 0 && filteredQuestions.every((q) => expandedIds[getQId(q)]);
 
+  // Total Selection Metrics
+  const totalSelectedCount = selectedQuestionIds.length;
+  const totalUnselectedCount = Math.max(0, questions.length - totalSelectedCount);
+
+  // Selection metrics within current filtered view
+  const filteredSelectedCount = filteredQuestions.filter((q) => selectedQuestionIds.includes(getQId(q))).length;
+  const filteredUnselectedCount = filteredQuestions.length - filteredSelectedCount;
+
   return (
     <div className="space-y-4">
-      {/* Search & Bulk Controls Header */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-        <div className="flex-1 max-w-md">
+      {/* Live Selection Status Summary Bar */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-3.5 rounded-2xl border bg-slate-900 text-white shadow-md">
+        <div className="flex items-center gap-2.5 flex-wrap">
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 text-xs font-extrabold">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+            <span>✓ Selected for Test: {totalSelectedCount}</span>
+          </div>
+
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-amber-500/20 border border-amber-500/30 text-amber-300 text-xs font-extrabold">
+            <span className="w-2 h-2 rounded-full bg-amber-400"></span>
+            <span>⭕ Unselected: {totalUnselectedCount}</span>
+          </div>
+
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-800 border border-slate-700 text-slate-300 text-xs font-medium">
+            <span>Total Question Bank: {questions.length}</span>
+          </div>
+        </div>
+
+        {(categoryFilter !== "All" || typeFilter !== "All" || searchQuery) && (
+          <div className="text-xs text-sky-300 font-mono font-semibold">
+            Filtered View: {filteredSelectedCount} selected / {filteredUnselectedCount} unselected
+          </div>
+        )}
+      </div>
+
+      {/* Optimized Filter Controls Toolbar */}
+      <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 p-3.5 rounded-2xl border bg-[var(--surface-color)] shadow-xs" style={{ borderColor: "var(--border-color)" }}>
+        {/* Search Input */}
+        <div className="sm:col-span-4">
+          <label className="block text-[11px] font-bold uppercase tracking-wider mb-1 text-[var(--text-muted)]">
+            Search Questions
+          </label>
           <Input
-            placeholder="🔍 Search questions by title, description or tag..."
+            placeholder="🔍 Search title, description or tag..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
         </div>
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={toggleExpandAll}
-            className="px-3 py-1.5 text-xs font-semibold rounded-lg border transition-colors cursor-pointer bg-[var(--surface-color)] text-[var(--text-primary)] border-[var(--border-color)] hover:bg-[var(--surface2-color)]"
+
+        {/* Category Selector Dropdown with Selected/Unselected Counts */}
+        <div className="sm:col-span-4">
+          <label className="block text-[11px] font-bold uppercase tracking-wider mb-1 text-[var(--text-muted)]">
+            Category Series ({categoriesList.length - 1} categories)
+          </label>
+          <select
+            value={categoryFilter}
+            onChange={(e) => {
+              setCategoryFilter(e.target.value);
+              setTypeFilter("All");
+            }}
+            className="w-full px-3 py-2 rounded-xl text-xs font-semibold border outline-none cursor-pointer transition-all focus:border-sky-500"
+            style={{
+              backgroundColor: "var(--surface2-color)",
+              color: "var(--text-primary)",
+              borderColor: "var(--border-color)",
+            }}
           >
-            {isAllExpanded ? "Collapse All Descriptions ▲" : "Expand All Descriptions ▼"}
-          </button>
+            <option value="All">📁 All Categories ({totalSelectedCount} selected / {totalUnselectedCount} unselected)</option>
+            {Object.entries(categoryCounts).map(([cat, totalCount]) => {
+              const catQIds = questions.filter((q) => (q.category || "General") === cat).map(getQId);
+              const selCount = catQIds.filter((id) => selectedQuestionIds.includes(id)).length;
+              const unselCount = totalCount - selCount;
+
+              return (
+                <option key={cat} value={cat}>
+                  📂 {cat} ({selCount} selected / {unselCount} unselected)
+                </option>
+              );
+            })}
+          </select>
+        </div>
+
+        {/* Question Type Selector Dropdown */}
+        <div className="sm:col-span-4">
+          <label className="block text-[11px] font-bold uppercase tracking-wider mb-1 text-[var(--text-muted)]">
+            Question Type {categoryFilter !== "All" ? `(in ${categoryFilter})` : ""}
+          </label>
+          <select
+            value={typeFilter}
+            onChange={(e) => setTypeFilter(e.target.value)}
+            className="w-full px-3 py-2 rounded-xl text-xs font-semibold border outline-none cursor-pointer transition-all focus:border-sky-500"
+            style={{
+              backgroundColor: "var(--surface2-color)",
+              color: "var(--text-primary)",
+              borderColor: "var(--border-color)",
+            }}
+          >
+            <option value="All">✨ All Types ({categoryFilteredQuestions.length} questions)</option>
+            {Object.entries(typeCounts).map(([t, count]) => (
+              <option key={t} value={t}>
+                {typeLabels[t] || t.replace("_", " ")} ({count})
+              </option>
+            ))}
+          </select>
         </div>
       </div>
 
-      {/* Category Filter Tabs */}
-      <div className="flex flex-wrap gap-2 pt-1">
-        {categoriesList.map((cat) => {
-          const count = cat === "All" ? questions.length : questions.filter((q) => (q.category || "General") === cat).length;
-          const isActive = categoryFilter === cat;
-
-          return (
+      {/* Active Filter Badges Bar */}
+      <div className="flex flex-wrap items-center justify-between gap-2 px-1">
+        <div className="flex items-center gap-2 flex-wrap text-xs">
+          <span className="text-[var(--text-muted)] font-medium">Showing {filteredQuestions.length} of {questions.length} questions</span>
+          {categoryFilter !== "All" && (
+            <Badge variant="accent" className="flex items-center gap-1">
+              <span>Category: {categoryFilter} ({categoryFilteredQuestions.length})</span>
+              <button type="button" onClick={() => setCategoryFilter("All")} className="hover:text-white font-bold ml-1 cursor-pointer">✕</button>
+            </Badge>
+          )}
+          {typeFilter !== "All" && (
+            <Badge variant="neutral" className="flex items-center gap-1 bg-sky-500/10 text-sky-600 border-sky-500/20">
+              <span>Type: {typeLabels[typeFilter] || typeFilter}</span>
+              <button type="button" onClick={() => setTypeFilter("All")} className="hover:text-sky-900 font-bold ml-1 cursor-pointer">✕</button>
+            </Badge>
+          )}
+          {searchQuery && (
+            <Badge variant="neutral" className="flex items-center gap-1">
+              <span>Search: "{searchQuery}"</span>
+              <button type="button" onClick={() => setSearchQuery("")} className="hover:text-slate-900 font-bold ml-1 cursor-pointer">✕</button>
+            </Badge>
+          )}
+          {(categoryFilter !== "All" || typeFilter !== "All" || searchQuery) && (
             <button
-              key={cat}
-              onClick={() => setCategoryFilter(cat)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
-                isActive
-                  ? "bg-sky-600 text-white shadow-sm"
-                  : "bg-[var(--surface2-color)] text-[var(--text-muted)] hover:text-[var(--text-primary)] border"
-              }`}
-              style={{ borderColor: "var(--border-color)" }}
+              type="button"
+              onClick={() => {
+                setCategoryFilter("All");
+                setTypeFilter("All");
+                setSearchQuery("");
+              }}
+              className="text-xs font-semibold text-rose-500 hover:underline cursor-pointer ml-1"
             >
-              <span>{cat}</span>
-              <span className={`px-1.5 py-0.2 rounded text-[10px] ${isActive ? "bg-white/20 text-white" : "bg-sky-500/10 text-sky-600"}`}>
-                {count}
-              </span>
+              Clear All Filters
             </button>
-          );
-        })}
+          )}
+        </div>
+
+        <button
+          type="button"
+          onClick={toggleExpandAll}
+          className="px-3 py-1.5 text-xs font-semibold rounded-lg border transition-colors cursor-pointer bg-[var(--surface-color)] text-[var(--text-primary)] border-[var(--border-color)] hover:bg-[var(--surface2-color)]"
+        >
+          {isAllExpanded ? "Collapse All Descriptions ▲" : "Expand All Descriptions ▼"}
+        </button>
       </div>
 
       {/* Question Bank List */}
@@ -171,7 +328,9 @@ export default function CategoryQuestionPicker({
         <div className="space-y-6 max-h-[600px] overflow-y-auto pr-1 pt-2">
           {Array.from(groupedMap.entries()).map(([catName, catQuestions]) => {
             const catQIds = catQuestions.map(getQId);
-            const allSelected = catQIds.every((id) => selectedQuestionIds.includes(id));
+            const catSelCount = catQIds.filter((id) => selectedQuestionIds.includes(id)).length;
+            const catUnselCount = catQuestions.length - catSelCount;
+            const allSelected = catQIds.length > 0 && catSelCount === catQIds.length;
 
             return (
               <div
@@ -180,18 +339,23 @@ export default function CategoryQuestionPicker({
                 style={{ backgroundColor: "var(--surface2-color)", borderColor: "var(--border-color)" }}
               >
                 {/* Category Header */}
-                <div className="flex items-center justify-between pb-2 border-b" style={{ borderColor: "var(--border-color)" }}>
-                  <div className="flex items-center gap-2">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 pb-2 border-b" style={{ borderColor: "var(--border-color)" }}>
+                  <div className="flex items-center gap-2 flex-wrap">
                     <span className="w-2.5 h-2.5 rounded-full bg-sky-500"></span>
                     <h4 className="text-sm font-bold text-[var(--text-primary)] uppercase tracking-wider">{catName} Series</h4>
-                    <span className="text-xs text-[var(--text-muted)]">({catQuestions.length} Questions)</span>
+                    <span className="px-2 py-0.5 rounded-md text-xs font-extrabold bg-emerald-500/10 text-emerald-600 border border-emerald-500/20">
+                      ✓ {catSelCount} Selected
+                    </span>
+                    <span className="px-2 py-0.5 rounded-md text-xs font-bold bg-amber-500/10 text-amber-600 border border-amber-500/20">
+                      ⭕ {catUnselCount} Unselected
+                    </span>
                   </div>
                   <button
                     type="button"
                     onClick={() => onSelectAllCategory(catName)}
-                    className="text-xs font-semibold text-sky-600 hover:underline cursor-pointer"
+                    className="text-xs font-bold text-sky-600 hover:underline cursor-pointer"
                   >
-                    {allSelected ? "✓ Deselect Category" : "+ Select All Category Questions"}
+                    {allSelected ? "✓ Deselect All Category Questions" : "+ Select All Category Questions"}
                   </button>
                 </div>
 
@@ -270,7 +434,7 @@ export default function CategoryQuestionPicker({
 
                             {/* Badges Bar */}
                             <div className="flex flex-wrap items-center gap-2 mt-2.5">
-                              <Badge variant="neutral">{q.type ? q.type.replace("_", " ") : "mcq"}</Badge>
+                              {typeBadge(q.type || "mcq_single")}
                               {diffBadge(q.difficulty)}
                               <span className="text-xs text-[var(--text-muted)] font-medium">{q.marks} marks</span>
                               {q.negativeMarks ? (

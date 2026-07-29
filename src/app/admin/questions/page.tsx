@@ -305,8 +305,11 @@ export default function QuestionsPage() {
                 value={categoryFilter}
                 onChange={(e) => setCategoryFilter(e.target.value)}
                 options={[
-                  { value: "All", label: `All Categories (${questions.length})` },
-                  ...availableCategories.map((c) => ({ value: c, label: c })),
+                  { value: "All", label: `📁 All Categories (${questions.length} questions)` },
+                  ...availableCategories.map((c) => {
+                    const count = questions.filter((q) => (q.category || "General") === c).length;
+                    return { value: c, label: `📂 ${c} (${count})` };
+                  }),
                 ]}
               />
 
@@ -314,13 +317,13 @@ export default function QuestionsPage() {
                 value={typeFilter}
                 onChange={(e) => setTypeFilter(e.target.value)}
                 options={[
-                  { value: "", label: "All Question Types" },
-                  { value: "mcq_single", label: "Single Choice MCQ" },
-                  { value: "mcq_multi", label: "Multiple Choice MCQ" },
-                  { value: "coding", label: "Coding Monaco" },
-                  { value: "fill_blank", label: "Fill in Blanks" },
-                  { value: "true_false", label: "True / False" },
-                  { value: "text_area", label: "Text Area" },
+                  { value: "", label: "✨ All Question Types" },
+                  { value: "coding", label: `💻 Coding (${questions.filter((q) => q.type === "coding").length})` },
+                  { value: "mcq_single", label: `🔘 Single Choice (${questions.filter((q) => q.type === "mcq_single").length})` },
+                  { value: "mcq_multi", label: `☑️ Multiple Choice (${questions.filter((q) => q.type === "mcq_multi").length})` },
+                  { value: "text_area", label: `📝 Text Area (${questions.filter((q) => q.type === "text_area").length})` },
+                  { value: "fill_blank", label: `✏️ Fill Blanks (${questions.filter((q) => q.type === "fill_blank").length})` },
+                  { value: "true_false", label: `⚖️ True / False (${questions.filter((q) => q.type === "true_false").length})` },
                 ]}
               />
 
