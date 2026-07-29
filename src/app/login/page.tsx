@@ -84,7 +84,7 @@ export default function LoginPage() {
 
             <div className="flex items-center justify-between">
               <label className="flex items-center gap-2 cursor-pointer group">
-                <input type="checkbox" className="w-4 h-4 rounded border-[var(--border-color)] text-[var(--color-accent)] focus:ring-[var(--color-accent)]" />
+                <input type="checkbox" className="w-4 h-4 rounded border-[var(--border-color)] text-[var(--color-accent)] focus:ring-[var(--color-accent)]" defaultChecked />
                 <span className="text-sm text-[var(--text-secondary)] group-hover:text-[var(--text-primary)] transition-colors">Remember me</span>
               </label>
             </div>

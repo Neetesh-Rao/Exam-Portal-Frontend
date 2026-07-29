@@ -129,44 +129,44 @@ export default function TestInstructionsPage({ params }: { params: Promise<{ tok
   const isDevicesReady = cameraReady && screenReady;
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 py-12 px-4">
-      <div className="max-w-2xl mx-auto space-y-6">
-        <div className="text-center mb-8">
-          <div className="flex justify-center mb-4">
-            <img src="/bitmax-logo.png" alt="BITMAX Technology" className="h-10 w-auto object-contain" />
+    <div className="min-h-screen bg-slate-50 text-slate-900 py-6 sm:py-12 px-3 sm:px-6">
+      <div className="max-w-2xl mx-auto space-y-4 sm:space-y-6">
+        <div className="text-center mb-6 sm:mb-8">
+          <div className="flex justify-center mb-3 sm:mb-4">
+            <img src="/bitmax-logo.png" alt="BITMAX Technology" className="h-8 sm:h-10 w-auto object-contain" />
           </div>
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">{test?.title}</h1>
-          <p className="text-sm text-slate-600 mt-1">Welcome, {candidate?.name}</p>
+          <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">{test?.title}</h1>
+          <p className="text-xs sm:text-sm text-slate-600 mt-1">Welcome, {candidate?.name}</p>
         </div>
 
-        <Card className="bg-white border border-slate-200 shadow-sm">
-          <h2 className="text-lg font-bold text-slate-900 mb-4">Test Overview</h2>
-          {test?.description && <p className="text-sm text-slate-600 mb-4">{test.description}</p>}
-          <div className="grid grid-cols-2 gap-4">
+        <Card className="bg-white border border-slate-200 shadow-sm p-4 sm:p-6">
+          <h2 className="text-base sm:text-lg font-bold text-slate-900 mb-3 sm:mb-4">Test Overview</h2>
+          {test?.description && <p className="text-xs sm:text-sm text-slate-600 mb-4">{test.description}</p>}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
             <div className="p-3 bg-slate-100/80 rounded-xl border border-slate-200">
               <p className="text-xs text-slate-500 font-medium">Duration</p>
-              <p className="text-lg font-bold text-slate-900">{duration} minutes</p>
+              <p className="text-base sm:text-lg font-bold text-slate-900">{duration} minutes</p>
             </div>
             <div className="p-3 bg-slate-100/80 rounded-xl border border-slate-200">
               <p className="text-xs text-slate-500 font-medium">Tab Switch Limit</p>
-              <p className="text-lg font-bold text-slate-900">{proctoring.tabSwitchLimit} max allowed</p>
+              <p className="text-base sm:text-lg font-bold text-slate-900">{proctoring.tabSwitchLimit} max allowed</p>
             </div>
           </div>
         </Card>
 
-        <Card className="border-2 border-emerald-400 bg-emerald-50/70 shadow-sm space-y-4">
+        <Card className="border-2 border-emerald-400 bg-emerald-50/70 shadow-sm space-y-4 p-4 sm:p-6">
           <div className="flex items-center gap-2">
-            <ShieldCheck className="w-5 h-5 text-emerald-600" />
-            <h2 className="text-base font-bold text-slate-900">Step 1: Pre-Exam Device & Screen Sharing Setup</h2>
+            <ShieldCheck className="w-5 h-5 text-emerald-600 shrink-0" />
+            <h2 className="text-sm sm:text-base font-bold text-slate-900">Step 1: Pre-Exam Device & Screen Sharing Setup</h2>
           </div>
-          <p className="text-xs text-slate-600 font-medium">
+          <p className="text-xs text-slate-600 font-medium leading-relaxed">
             To prevent accidental proctoring violations during the exam, please grant Camera & Screen Sharing permissions now before clicking Start Test.
           </p>
 
           <div className="space-y-3">
-            <div className="flex items-center justify-between p-3.5 bg-white rounded-xl border border-slate-200 shadow-sm">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 p-3 sm:p-3.5 bg-white rounded-xl border border-slate-200 shadow-sm">
               <div className="flex items-center gap-2.5 text-xs font-bold text-slate-900">
-                <Camera className="w-4 h-4 text-emerald-600" />
+                <Camera className="w-4 h-4 text-emerald-600 shrink-0" />
                 <span>Webcam & Microphone Check</span>
               </div>
               {cameraReady ? (
@@ -176,9 +176,9 @@ export default function TestInstructionsPage({ params }: { params: Promise<{ tok
               )}
             </div>
 
-            <div className="flex items-center justify-between p-3.5 bg-white rounded-xl border border-slate-200 shadow-sm">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 p-3 sm:p-3.5 bg-white rounded-xl border border-slate-200 shadow-sm">
               <div className="flex items-center gap-2.5 text-xs font-bold text-slate-900">
-                <Monitor className="w-4 h-4 text-sky-600" />
+                <Monitor className="w-4 h-4 text-sky-600 shrink-0" />
                 <span>Entire Screen Sharing Check</span>
               </div>
               {screenReady ? (
@@ -194,43 +194,43 @@ export default function TestInstructionsPage({ params }: { params: Promise<{ tok
             onClick={handleDeviceSetup}
             loading={permissionsRequesting}
             variant={isDevicesReady ? "secondary" : "primary"}
-            className="w-full font-bold text-sm py-2.5 shadow-sm"
+            className="w-full font-bold text-xs sm:text-sm py-2.5 shadow-sm"
           >
-            {isDevicesReady ? "✓ Device & Screen Verification Complete" : "🎥 Step 1: Enable Camera & Share Entire Screen"}
+            {isDevicesReady ? "✓ Device & Screen Verification Complete" : "🎥 Step 1: Enable Camera & Share Screen"}
           </Button>
         </Card>
 
-        <Card className="bg-white border border-slate-200 shadow-sm">
-          <h2 className="text-lg font-bold text-slate-900 mb-4">Proctoring & Assessment Rules</h2>
+        <Card className="bg-white border border-slate-200 shadow-sm p-4 sm:p-6">
+          <h2 className="text-base sm:text-lg font-bold text-slate-900 mb-3 sm:mb-4">Proctoring & Assessment Rules</h2>
           <ul className="space-y-3 text-xs text-slate-700 font-medium">
-            <li className="flex items-start gap-3">
-              <span className="text-rose-600 font-bold">⚠️</span>
+            <li className="flex items-start gap-2.5">
+              <span className="text-rose-600 font-bold shrink-0">⚠️</span>
               <span>Do not switch tabs or windows during the test. Exceeding {proctoring.tabSwitchLimit} violations will automatically submit your exam.</span>
             </li>
             {proctoring.fullScreenRequired && (
-              <li className="flex items-start gap-3">
-                <span className="text-amber-500 font-bold">🖥️</span>
+              <li className="flex items-start gap-2.5">
+                <span className="text-amber-500 font-bold shrink-0">🖥️</span>
                 <span>The exam runs in mandatory full screen mode.</span>
               </li>
             )}
             {proctoring.disableCopyPaste && (
-              <li className="flex items-start gap-3">
-                <span className="text-amber-500 font-bold">📋</span>
+              <li className="flex items-start gap-2.5">
+                <span className="text-amber-500 font-bold shrink-0">📋</span>
                 <span>Copy, paste, and cut actions are disabled.</span>
               </li>
             )}
           </ul>
         </Card>
 
-        <Card className="bg-white border border-slate-200 shadow-sm">
+        <Card className="bg-white border border-slate-200 shadow-sm p-4 sm:p-6">
           <label className="flex items-start gap-3 cursor-pointer">
             <input
               type="checkbox"
               checked={agreed}
               onChange={(e) => setAgreed(e.target.checked)}
-              className="mt-1 accent-emerald-500 w-4 h-4 cursor-pointer"
+              className="mt-0.5 accent-emerald-500 w-4 h-4 cursor-pointer shrink-0"
             />
-            <span className="text-xs text-slate-700 font-semibold">
+            <span className="text-xs text-slate-700 font-semibold leading-relaxed">
               I understand and agree to follow all test proctoring rules.
             </span>
           </label>
@@ -242,7 +242,7 @@ export default function TestInstructionsPage({ params }: { params: Promise<{ tok
             loading={starting}
             disabled={!agreed || !isDevicesReady}
             size="lg"
-            className="px-12 w-full sm:w-auto"
+            className="w-full sm:w-auto px-8 sm:px-12 text-sm sm:text-base font-bold"
           >
             Step 2: Start Proctored Exam →
           </Button>

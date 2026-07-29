@@ -48,6 +48,7 @@ export default function ExamPage({ params }: { params: Promise<{ token: string }
   const [testEnded, setTestEnded] = useState(false);
   const [isGracePeriod, setIsGracePeriod] = useState(true);
   const [isFullscreenMode, setIsFullscreenMode] = useState(true);
+  const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
 
   const [proctoringConfig, setProctoringConfig] = useState<{ disableCopyPaste: boolean; disableRightClick: boolean; fullScreenRequired: boolean }>({
     disableCopyPaste: true,
@@ -383,7 +384,7 @@ export default function ExamPage({ params }: { params: Promise<{ token: string }
 
   return (
     <div
-      className="min-h-screen flex relative"
+      className="min-h-screen flex flex-col lg:flex-row relative"
       style={{
         backgroundColor: "var(--bg-color)",
         color: "var(--text-primary)",
@@ -391,23 +392,50 @@ export default function ExamPage({ params }: { params: Promise<{ token: string }
     >
       {/* Fullscreen Restriction Alert Bar */}
       {!isFullscreenMode && proctoringConfig.fullScreenRequired && !testEnded && (
-        <div className="fixed top-0 left-0 right-0 z-50 bg-rose-600 text-white px-4 py-2.5 text-xs font-bold flex items-center justify-between shadow-lg animate-pulse">
-          <div className="flex items-center gap-2">
+        <div className="fixed top-0 left-0 right-0 z-50 bg-rose-600 text-white px-3 sm:px-4 py-2 sm:py-2.5 text-xs font-bold flex flex-col sm:flex-row items-center justify-between gap-2 shadow-lg animate-pulse">
+          <div className="flex items-center gap-2 text-center sm:text-left">
             <span>⚠️ FULLSCREEN MODE REQUIRED! Exiting fullscreen is recorded as a security violation.</span>
           </div>
           <button
             type="button"
             onClick={requestFullscreenMode}
-            className="px-3 py-1 bg-white text-rose-700 rounded font-extrabold hover:bg-rose-50 transition-colors cursor-pointer shadow-sm"
+            className="px-3 py-1 bg-white text-rose-700 rounded font-extrabold hover:bg-rose-50 transition-colors cursor-pointer shadow-sm shrink-0"
           >
             ⛶ Re-enter Fullscreen Now
           </button>
         </div>
       )}
 
-      {/* Sidebar */}
+      {/* Mobile Top Header (Timer & Proctoring Status) */}
       <div
-        className="w-64 border-r flex flex-col fixed left-0 top-0 h-screen z-30"
+        className={`lg:hidden fixed left-0 right-0 z-30 h-14 border-b px-4 flex items-center justify-between shadow-xs transition-all ${
+          !isFullscreenMode && proctoringConfig.fullScreenRequired && !testEnded ? "top-11 sm:top-10" : "top-0"
+        }`}
+        style={{
+          backgroundColor: "var(--surface-color)",
+          borderColor: "var(--border-color)",
+        }}
+      >
+        <div className="flex items-center gap-2">
+          <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+          <span className="text-xs font-bold" style={{ color: "var(--text-primary)" }}>
+            Q{currentIdx + 1} of {questions.length}
+          </span>
+        </div>
+
+        <div className="flex items-center gap-2 text-xs font-mono font-bold">
+          <span className={`px-2 py-1 rounded ${isWarningTime ? "bg-rose-500 text-white animate-pulse" : "bg-sky-500/10 text-sky-600 dark:text-sky-400"}`}>
+            ⏱️ {formatTime(displayTime)}
+          </span>
+          <span className={`px-2 py-1 rounded ${violations > 0 ? "bg-rose-500/10 text-rose-600" : "bg-emerald-500/10 text-emerald-600"}`}>
+            ⚠️ {violations}/{maxViolations}
+          </span>
+        </div>
+      </div>
+
+      {/* Desktop Permanent Sidebar (Hidden on mobile) */}
+      <div
+        className="hidden lg:flex w-64 border-r flex-col fixed left-0 top-0 h-screen z-30"
         style={{
           backgroundColor: "var(--surface-color)",
           borderColor: "var(--border-color)",
@@ -514,20 +542,20 @@ export default function ExamPage({ params }: { params: Promise<{ token: string }
       </div>
 
       {/* Main Content Area */}
-      <div className="flex-1 ml-64 p-8 pt-10">
+      <div className="flex-1 ml-0 lg:ml-64 p-3 sm:p-6 lg:p-8 pt-16 lg:pt-10 max-w-full overflow-x-hidden">
         {currentQuestion && (
-          <div className="max-w-3xl mx-auto space-y-6">
+          <div className="max-w-3xl mx-auto space-y-4 sm:space-y-6">
             {/* Question Header */}
-            <div className="flex items-start justify-between pb-4 border-b" style={{ borderColor: "var(--border-color)" }}>
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 pb-3 sm:pb-4 border-b" style={{ borderColor: "var(--border-color)" }}>
               <div>
                 <p className="text-xs font-semibold mb-1" style={{ color: "var(--text-muted)" }}>
                   Question {currentIdx + 1} of {questions.length}
                 </p>
-                <h2 className="text-xl font-extrabold tracking-tight leading-snug" style={{ color: "var(--text-primary)" }}>
+                <h2 className="text-lg sm:text-xl font-extrabold tracking-tight leading-snug" style={{ color: "var(--text-primary)" }}>
                   {currentQuestion.title}
                 </h2>
               </div>
-              <div className="flex items-center gap-2 shrink-0">
+              <div className="flex items-center gap-2 shrink-0 self-start sm:self-auto">
                 <Badge variant="neutral">{currentQuestion.marks} marks</Badge>
                 <Badge variant="accent">{currentQuestion.type.replace(/_/g, " ")}</Badge>
               </div>
@@ -535,14 +563,14 @@ export default function ExamPage({ params }: { params: Promise<{ token: string }
 
             {/* Question Description / Statement */}
             {currentQuestion.description && (
-              <div className="p-4 rounded-xl border leading-relaxed text-sm whitespace-pre-wrap" style={{ backgroundColor: "var(--surface2-color)", borderColor: "var(--border-color)", color: "var(--text-primary)" }}>
+              <div className="p-3.5 sm:p-4 rounded-xl border leading-relaxed text-xs sm:text-sm whitespace-pre-wrap" style={{ backgroundColor: "var(--surface2-color)", borderColor: "var(--border-color)", color: "var(--text-primary)" }}>
                 {currentQuestion.description}
               </div>
             )}
 
             {/* Answer Box */}
             <div
-              className="rounded-2xl p-6 border shadow-sm space-y-4"
+              className="rounded-2xl p-4 sm:p-6 border shadow-sm space-y-4"
               style={{
                 backgroundColor: "var(--surface-color)",
                 borderColor: "var(--border-color)",
@@ -550,7 +578,7 @@ export default function ExamPage({ params }: { params: Promise<{ token: string }
             >
               {/* MCQ Options */}
               {["mcq_single", "mcq_multi", "true_false"].includes(currentQuestion.type) && (
-                <div className="space-y-3">
+                <div className="space-y-2.5 sm:space-y-3">
                   {currentQuestion.options?.map((opt) => {
                     const isSelected = currentAnswer?.selectedOptionIds?.includes(opt.id);
                     const inputType = currentQuestion.type === "mcq_multi" ? "checkbox" : "radio";
@@ -558,7 +586,7 @@ export default function ExamPage({ params }: { params: Promise<{ token: string }
                     return (
                       <label
                         key={opt.id}
-                        className="flex items-center gap-3.5 p-4 rounded-xl border cursor-pointer transition-all duration-150"
+                        className="flex items-center gap-3 p-3 sm:p-4 rounded-xl border cursor-pointer transition-all duration-150 text-xs sm:text-sm"
                         style={{
                           backgroundColor: isSelected ? "var(--surface2-color)" : "var(--surface-color)",
                           borderColor: isSelected ? "#0284c7" : "var(--border-color)",
@@ -578,10 +606,10 @@ export default function ExamPage({ params }: { params: Promise<{ token: string }
                               updateAnswer({ selectedOptionIds: [opt.id] });
                             }
                           }}
-                          className="w-4 h-4 accent-sky-600 cursor-pointer"
+                          className="w-4 h-4 accent-sky-600 cursor-pointer shrink-0"
                         />
                         <span
-                          className="text-sm font-medium leading-relaxed"
+                          className="font-medium leading-relaxed"
                           style={{ color: "var(--text-primary)" }}
                         >
                           {opt.text}
@@ -598,7 +626,7 @@ export default function ExamPage({ params }: { params: Promise<{ token: string }
                   value={currentAnswer?.answerText || ""}
                   onChange={(e) => updateAnswer({ answerText: e.target.value })}
                   placeholder="Type your detailed answer here..."
-                  className="w-full h-44 p-4 border rounded-xl text-sm outline-none focus:border-sky-500 resize-none font-sans"
+                  className="w-full h-36 sm:h-44 p-3 sm:p-4 border rounded-xl text-xs sm:text-sm outline-none focus:border-sky-500 resize-none font-sans"
                   style={{
                     backgroundColor: "var(--surface2-color)",
                     color: "var(--text-primary)",
@@ -609,43 +637,125 @@ export default function ExamPage({ params }: { params: Promise<{ token: string }
 
               {/* Coding Monaco Editor */}
               {currentQuestion.type === "coding" && (
-                <div>
+                <div className="w-full overflow-hidden">
                   <CodeEditor
                     value={currentAnswer?.codeAnswer || currentQuestion.codeConfig?.starterCode || ""}
                     onChange={(val) => updateAnswer({ codeAnswer: val })}
                     language={currentQuestion.codeConfig?.language || "javascript"}
                     disablePaste={currentQuestion.codeConfig?.disablePaste}
                     onPasteAttempt={() => triggerViolation("paste_attempt", "Pasting code in the editor is strictly disabled.")}
-                    height="380px"
+                    height="320px"
                   />
                 </div>
               )}
             </div>
 
             {/* Navigation Actions */}
-            <div className="flex items-center justify-between pt-2">
-              <div className="flex gap-3">
-                <Button variant="secondary" onClick={() => setCurrentIdx(Math.max(0, currentIdx - 1))} disabled={currentIdx === 0}>
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-2">
+              <div className="flex gap-2 sm:gap-3">
+                <Button variant="secondary" onClick={() => setCurrentIdx(Math.max(0, currentIdx - 1))} disabled={currentIdx === 0} className="flex-1 sm:flex-initial text-xs sm:text-sm">
                   ← Previous
                 </Button>
-                <Button variant="secondary" onClick={() => setCurrentIdx(Math.min(questions.length - 1, currentIdx + 1))} disabled={currentIdx === questions.length - 1}>
+                <Button variant="secondary" onClick={() => setCurrentIdx(Math.min(questions.length - 1, currentIdx + 1))} disabled={currentIdx === questions.length - 1} className="flex-1 sm:flex-initial text-xs sm:text-sm">
                   Next →
                 </Button>
               </div>
-              <div className="flex gap-3">
+              <div className="flex gap-2 sm:gap-3">
                 <Button
                   variant="ghost"
                   onClick={() => {
                     updateAnswer({ selectedOptionIds: [], answerText: "", codeAnswer: "" });
                   }}
+                  className="flex-1 sm:flex-initial text-xs sm:text-sm"
                 >
                   Clear Response
                 </Button>
                 <Button
                   variant={currentAnswer?.isMarkedForReview ? "secondary" : "ghost"}
                   onClick={() => updateAnswer({ isMarkedForReview: !currentAnswer?.isMarkedForReview })}
+                  className="flex-1 sm:flex-initial text-xs sm:text-sm"
                 >
-                  {currentAnswer?.isMarkedForReview ? "✓ Marked for Review" : "Mark for Review"}
+                  {currentAnswer?.isMarkedForReview ? "✓ Marked" : "Mark for Review"}
+                </Button>
+              </div>
+            </div>
+
+            {/* Mobile Stacked Section: Question Navigator, Camera & Submit Button (Rendered directly below questions on mobile) */}
+            <div className="lg:hidden mt-8 space-y-4 pt-6 border-t" style={{ borderColor: "var(--border-color)" }}>
+              {/* Question Navigator Grid Card */}
+              <div
+                className="p-4 rounded-2xl border shadow-xs"
+                style={{
+                  backgroundColor: "var(--surface-color)",
+                  borderColor: "var(--border-color)",
+                }}
+              >
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-xs font-extrabold uppercase tracking-wider" style={{ color: "var(--text-primary)" }}>
+                    Question Navigator
+                  </h3>
+                  <span className="text-[11px] font-semibold text-sky-600 dark:text-sky-400">
+                    {answers.filter((a) => a.selectedOptionIds?.length || a.answerText || a.codeAnswer).length}/{questions.length} Answered
+                  </span>
+                </div>
+                <div className="grid grid-cols-5 gap-2">
+                  {questions.map((q, idx) => {
+                    const ans = answers.find((a) => a.questionId === q.id);
+                    const hasAnswer = ans?.selectedOptionIds?.length || ans?.answerText || ans?.codeAnswer;
+                    const isMarked = ans?.isMarkedForReview;
+                    const isCurrent = idx === currentIdx;
+
+                    return (
+                      <button
+                        key={q.id}
+                        onClick={() => {
+                          setCurrentIdx(idx);
+                          window.scrollTo({ top: 0, behavior: "smooth" });
+                        }}
+                        className={`h-10 rounded-xl text-xs font-extrabold flex items-center justify-center border transition-all cursor-pointer ${
+                          isCurrent
+                            ? "bg-sky-600 text-white border-sky-600 shadow-md ring-2 ring-sky-400/30"
+                            : isMarked
+                            ? "bg-amber-500 text-white border-transparent"
+                            : hasAnswer
+                            ? "bg-emerald-600 text-white border-transparent"
+                            : ""
+                        }`}
+                        style={
+                          !isCurrent && !isMarked && !hasAnswer
+                            ? {
+                                backgroundColor: "var(--surface2-color)",
+                                color: "var(--text-secondary)",
+                                borderColor: "var(--border-color)",
+                              }
+                            : {}
+                        }
+                      >
+                        {idx + 1}
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className="mt-3 flex items-center justify-around text-[11px] font-medium pt-2 border-t" style={{ borderColor: "var(--border-color)" }}>
+                  <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded border" style={{ backgroundColor: "var(--surface2-color)", borderColor: "var(--border-color)" }} /><span style={{ color: "var(--text-muted)" }}>Not visited</span></div>
+                  <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded bg-emerald-600" /><span style={{ color: "var(--text-muted)" }}>Answered</span></div>
+                  <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded bg-amber-500" /><span style={{ color: "var(--text-muted)" }}>Marked</span></div>
+                </div>
+              </div>
+
+              {/* Submit Final Assessment Button Card */}
+              <div className="p-4 rounded-2xl border shadow-sm bg-sky-50 dark:bg-sky-950/40 border-sky-200 dark:border-sky-800 text-center space-y-3">
+                <div>
+                  <h4 className="text-sm font-extrabold text-slate-900 dark:text-white">Ready to Finish Your Test?</h4>
+                  <p className="text-xs text-slate-600 dark:text-slate-300 mt-0.5 font-medium">
+                    Review your answers and submit your final assessment.
+                  </p>
+                </div>
+                <Button
+                  onClick={() => setShowConfirmSubmit(true)}
+                  className="w-full py-3 bg-sky-600 hover:bg-sky-700 text-white font-extrabold text-sm shadow-md rounded-xl"
+                >
+                  ✓ Submit Assessment Test
                 </Button>
               </div>
             </div>

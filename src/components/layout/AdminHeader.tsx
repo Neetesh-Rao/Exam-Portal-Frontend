@@ -2,7 +2,13 @@
 import { useState, useEffect } from "react";
 import Button from "../ui/Button";
 
-export default function AdminHeader({ title, subtitle }: { title: string; subtitle?: string }) {
+interface AdminHeaderProps {
+  title: string;
+  subtitle?: string;
+  onMenuClick?: () => void;
+}
+
+export default function AdminHeader({ title, subtitle, onMenuClick }: AdminHeaderProps) {
   const [dark, setDark] = useState(false);
 
   useEffect(() => {
@@ -22,17 +28,38 @@ export default function AdminHeader({ title, subtitle }: { title: string; subtit
 
   return (
     <header
-      className="h-16 flex items-center justify-between px-8"
+      className="h-16 flex items-center justify-between px-4 sm:px-8 shrink-0"
       style={{
         backgroundColor: "var(--surface-color)",
         borderBottom: "1px solid var(--border-color)",
       }}
     >
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight text-[var(--text-primary)]">{title}</h1>
-        {subtitle && <p className="text-sm text-[var(--text-muted)]">{subtitle}</p>}
-      </div>
       <div className="flex items-center gap-3">
+        <button
+          type="button"
+          onClick={() => {
+            if (onMenuClick) {
+              onMenuClick();
+            } else {
+              window.dispatchEvent(new Event("toggle-admin-sidebar"));
+            }
+          }}
+          className="p-2 rounded-lg lg:hidden cursor-pointer hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors"
+          style={{ color: "var(--text-primary)" }}
+          aria-label="Toggle menu"
+        >
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="3" y1="12" x2="21" y2="12" />
+            <line x1="3" y1="6" x2="21" y2="6" />
+            <line x1="3" y1="18" x2="21" y2="18" />
+          </svg>
+        </button>
+        <div>
+          <h1 className="text-lg sm:text-2xl font-bold tracking-tight text-[var(--text-primary)]">{title}</h1>
+          {subtitle && <p className="text-xs sm:text-sm text-[var(--text-muted)] line-clamp-1">{subtitle}</p>}
+        </div>
+      </div>
+      <div className="flex items-center gap-2 sm:gap-3 shrink-0">
         <Button variant="ghost" size="sm" onClick={toggleTheme}>
           {dark ? (
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>

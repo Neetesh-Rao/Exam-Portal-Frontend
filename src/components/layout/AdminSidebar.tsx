@@ -78,7 +78,12 @@ const navItems = [
   },
 ];
 
-export default function AdminSidebar() {
+interface AdminSidebarProps {
+  isOpen?: boolean;
+  onClose?: () => void;
+}
+
+export default function AdminSidebar({ isOpen = false, onClose }: AdminSidebarProps) {
   const pathname = usePathname();
   const [logout] = useLogoutMutation();
 
@@ -95,73 +100,82 @@ export default function AdminSidebar() {
   };
 
   return (
-    <aside
-      className="w-64 h-screen flex flex-col fixed left-0 top-0 z-40"
-      style={{
-        backgroundColor: "var(--surface-color)",
-        borderRight: "1px solid var(--border-color)",
-      }}
-    >
-      <div
-        className="h-16 flex items-center px-4"
-        style={{ borderBottom: "1px solid var(--border-color)" }}
-      >
-        <Link href="/admin/dashboard" className="flex items-center gap-2">
-          <img src="/bitmax-logo.png" alt="Bitmax Technology" className="h-9 w-auto object-contain" />
-        </Link>
-      </div>
+    <>
+      {/* Mobile Drawer Overlay */}
+      {isOpen && (
+        <div
+          className="fixed inset-0 bg-black/60 backdrop-blur-xs z-40 lg:hidden"
+          onClick={onClose}
+        />
+      )}
 
-      <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-        {navItems.map((item) => {
-          const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 ${
-                isActive
-                  ? "text-[var(--text-primary)]"
-                  : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-              }`}
-              style={isActive ? { backgroundColor: "var(--surface2-color)" } : {}}
-              onMouseEnter={(e) => {
-                if (!isActive) (e.currentTarget as HTMLAnchorElement).style.backgroundColor = "var(--surface2-color)";
-              }}
-              onMouseLeave={(e) => {
-                if (!isActive) (e.currentTarget as HTMLAnchorElement).style.backgroundColor = "";
-              }}
-            >
-              <span className={isActive ? "text-[var(--text-primary)]" : ""}>{item.icon}</span>
-              {item.label}
-            </Link>
-          );
-        })}
-      </nav>
-
-      <div
-        className="p-4 pb-8"
-        style={{ borderTop: "1px solid var(--border-color)" }}
+      <aside
+        className={`w-64 h-screen flex flex-col fixed left-0 top-0 z-50 lg:z-40 transition-transform duration-300 ease-in-out ${
+          isOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
+        }`}
+        style={{
+          backgroundColor: "var(--surface-color)",
+          borderRight: "1px solid var(--border-color)",
+        }}
       >
-        <button
-          type="button"
-          onClick={handleLogout}
-          className="flex items-center gap-3 w-full px-3 py-2.5 text-sm font-medium rounded-lg transition-colors cursor-pointer"
-          style={{ color: "var(--text-muted)" }}
-          onMouseEnter={(e) => {
-            (e.currentTarget as HTMLButtonElement).style.color = "#dc2626";
-            (e.currentTarget as HTMLButtonElement).style.backgroundColor = "var(--badge-danger-bg)";
-          }}
-          onMouseLeave={(e) => {
-            (e.currentTarget as HTMLButtonElement).style.color = "var(--text-muted)";
-            (e.currentTarget as HTMLButtonElement).style.backgroundColor = "transparent";
-          }}
+        <div
+          className="h-16 flex items-center justify-between px-4"
+          style={{ borderBottom: "1px solid var(--border-color)" }}
         >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" />
-          </svg>
-          Sign Out
-        </button>
-      </div>
-    </aside>
+          <Link href="/admin/dashboard" className="flex items-center gap-2" onClick={onClose}>
+            <img src="/bitmax-logo.png" alt="Bitmax Technology" className="h-8 sm:h-9 w-auto object-contain" />
+          </Link>
+          {onClose && (
+            <button
+              type="button"
+              onClick={onClose}
+              className="p-1.5 text-xs font-bold rounded-lg lg:hidden cursor-pointer"
+              style={{ color: "var(--text-muted)" }}
+            >
+              ✕
+            </button>
+          )}
+        </div>
+
+        <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+          {navItems.map((item) => {
+            const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                onClick={onClose}
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 ${
+                  isActive
+                    ? "text-[var(--text-primary)]"
+                    : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                }`}
+                style={isActive ? { backgroundColor: "var(--surface2-color)" } : {}}
+              >
+                <span className={isActive ? "text-[var(--text-primary)]" : ""}>{item.icon}</span>
+                {item.label}
+              </Link>
+            );
+          })}
+        </nav>
+
+        <div
+          className="p-4 pb-8"
+          style={{ borderTop: "1px solid var(--border-color)" }}
+        >
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="flex items-center gap-3 w-full px-3 py-2.5 text-sm font-medium rounded-lg transition-colors cursor-pointer"
+            style={{ color: "var(--text-muted)" }}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" />
+            </svg>
+            Sign Out
+          </button>
+        </div>
+      </aside>
+    </>
   );
 }
