@@ -159,7 +159,8 @@ export default function QuestionsPage() {
     if (["mcq_single", "mcq_multi", "true_false"].includes(form.type)) {
       payload.options = form.options;
     }
-    if (form.type === "fill_blank") {
+    // Always send correctTextAnswer for text-based answer types (fill_blank, text_area, coding)
+    if (["fill_blank", "text_area", "coding"].includes(form.type)) {
       payload.correctTextAnswer = form.correctTextAnswer;
     }
     if (form.type === "coding") {
@@ -232,7 +233,8 @@ export default function QuestionsPage() {
     if (["mcq_single", "mcq_multi", "true_false"].includes(editForm.type)) {
       payload.options = editForm.options;
     }
-    if (editForm.type === "fill_blank") {
+    // Always send correctTextAnswer for text-based answer types (fill_blank, text_area, coding)
+    if (["fill_blank", "text_area", "coding"].includes(editForm.type)) {
       payload.correctTextAnswer = editForm.correctTextAnswer;
     }
     if (editForm.type === "coding") {
@@ -344,46 +346,7 @@ export default function QuestionsPage() {
             </div>
           </div>
 
-          {/* Active Category Filter Chips Bar */}
-          <div className="flex items-center gap-2 pt-2 border-t flex-wrap" style={{ borderColor: "var(--border-color)" }}>
-            <span className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)] mr-1">
-              Active Topics:
-            </span>
-            <button
-              onClick={() => setCategoryFilter("All")}
-              className={`px-3 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer ${
-                categoryFilter === "All"
-                  ? "bg-sky-600 text-white shadow-sm"
-                  : "bg-[var(--surface2-color)] text-[var(--text-muted)] hover:text-[var(--text-primary)] border"
-              }`}
-              style={{ borderColor: "var(--border-color)" }}
-            >
-              All ({questions.length})
-            </button>
-
-            {activeCategories.map((cat) => {
-              const count = questions.filter((q) => (q.category || "General") === cat).length;
-              const isActive = categoryFilter === cat;
-
-              return (
-                <button
-                  key={cat}
-                  onClick={() => setCategoryFilter(cat)}
-                  className={`px-3 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
-                    isActive
-                      ? "bg-sky-600 text-white shadow-sm"
-                      : "bg-[var(--surface2-color)] text-[var(--text-muted)] hover:text-[var(--text-primary)] border"
-                  }`}
-                  style={{ borderColor: "var(--border-color)" }}
-                >
-                  <span>{cat}</span>
-                  <span className={`px-1.5 py-0.2 rounded text-[10px] ${isActive ? "bg-white/20 text-white" : "bg-sky-500/10 text-sky-600"}`}>
-                    {count}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
+         
         </Card>
 
         {/* Clean Theme-Matched Questions Table */}
@@ -621,6 +584,23 @@ export default function QuestionsPage() {
             </div>
           )}
 
+          {/* Correct Answer Field (for auto-grading) — fill_blank, text_area, coding */}
+          {["fill_blank", "text_area", "coding"].includes(form.type) && (
+            <div className="border-t pt-3 space-y-1" style={{ borderColor: "var(--border-color)" }}>
+              <p className="text-[11px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">✓ Correct Answer (Auto-Grading)</p>
+              <p className="text-[11px] text-[var(--text-muted)] mb-1.5">
+                {form.type === "fill_blank" ? "Exact answer expected (case-insensitive match)." : form.type === "coding" ? "Expected output or solution to compare against candidate's code output." : "Expected keywords/phrases for auto-evaluation. Leave blank to skip auto-grading."}
+              </p>
+              <Textarea
+                label=""
+                value={form.correctTextAnswer}
+                onChange={(e) => setForm({ ...form, correctTextAnswer: e.target.value })}
+                rows={form.type === "coding" ? 3 : 2}
+                placeholder={form.type === "fill_blank" ? "e.g. Array.prototype.map" : form.type === "coding" ? "e.g. expected output or solution code" : "e.g. useState, useEffect, React hook"}
+              />
+            </div>
+          )}
+
           <div className="flex justify-end gap-3 pt-4">
             <Button variant="secondary" onClick={() => setShowCreate(false)}>Cancel</Button>
             <Button onClick={handleCreate} disabled={saving || !form.title}>
@@ -661,6 +641,54 @@ export default function QuestionsPage() {
             value={editForm.description}
             onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
           />
+
+          {/* MCQ Options */}
+          {["mcq_single", "mcq_multi", "true_false"].includes(editForm.type) && (
+            <div className="space-y-2 border-t pt-3" style={{ borderColor: "var(--border-color)" }}>
+              <p className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">MCQ Options Configuration</p>
+              {editForm.options.map((opt, idx) => (
+                <div key={opt.id} className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={opt.isCorrect}
+                    onChange={(e) => {
+                      const updated = [...editForm.options];
+                      updated[idx].isCorrect = e.target.checked;
+                      setEditForm({ ...editForm, options: updated });
+                    }}
+                    className="accent-sky-600"
+                  />
+                  <Input
+                    placeholder={`Option ${idx + 1}`}
+                    value={opt.text}
+                    onChange={(e) => {
+                      const updated = [...editForm.options];
+                      updated[idx].text = e.target.value;
+                      setEditForm({ ...editForm, options: updated });
+                    }}
+                  />
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Correct Answer for auto-grading */}
+          {["fill_blank", "text_area", "coding"].includes(editForm.type) && (
+            <div className="border-t pt-3 space-y-1" style={{ borderColor: "var(--border-color)" }}>
+              <p className="text-[11px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">✓ Correct Answer (Auto-Grading)</p>
+              <p className="text-[11px] text-[var(--text-muted)] mb-1.5">
+                {editForm.type === "fill_blank" ? "Exact answer expected (case-insensitive match)." : editForm.type === "coding" ? "Expected output or solution to compare against candidate's code." : "Expected keywords/phrases. Leave blank to skip auto-grading."}
+              </p>
+              <Textarea
+                label=""
+                value={editForm.correctTextAnswer}
+                onChange={(e) => setEditForm({ ...editForm, correctTextAnswer: e.target.value })}
+                rows={editForm.type === "coding" ? 3 : 2}
+                placeholder={editForm.type === "fill_blank" ? "e.g. Array.prototype.map" : "e.g. useState, useEffect, React hook"}
+              />
+            </div>
+          )}
+
           <div className="flex justify-end gap-3 pt-4">
             <Button variant="secondary" onClick={() => setEditTarget(null)}>Cancel</Button>
             <Button onClick={handleUpdate} disabled={updating || !editForm.title}>
