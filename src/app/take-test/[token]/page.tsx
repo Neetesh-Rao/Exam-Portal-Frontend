@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 import Badge from "@/components/ui/Badge";
-import { Camera, Monitor, ShieldCheck } from "lucide-react";
+import { Camera, ShieldCheck } from "lucide-react";
 import { useValidateInviteQuery } from "@/redux/api/invitesApi";
 import { useStartSubmissionMutation } from "@/redux/api/submissionsApi";
 
@@ -20,7 +20,6 @@ export default function TestInstructionsPage({ params }: { params: Promise<{ tok
   const [error, setError] = useState("");
 
   const [cameraReady, setCameraReady] = useState(false);
-  const [screenReady, setScreenReady] = useState(false);
   const [permissionsRequesting, setPermissionsRequesting] = useState(false);
 
   const { data, isLoading: loading, isError } = useValidateInviteQuery(token);
@@ -43,22 +42,12 @@ export default function TestInstructionsPage({ params }: { params: Promise<{ tok
       }
     }
 
-    try {
-      if (navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia) {
-        const scrStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
-        (window as any).__screenStream = scrStream;
-        setScreenReady(true);
-      }
-    } catch (err) {
-      setScreenReady(true);
-    }
-
     setPermissionsRequesting(false);
   };
 
   const handleStart = async () => {
     if (!cameraReady) {
-      alert("Please click 'Step 1: Enable Camera & Share Entire Screen' to verify device access.");
+      alert("Please click 'Step 1: Enable Camera' to verify camera access before starting the test.");
       return;
     }
 
@@ -126,7 +115,6 @@ export default function TestInstructionsPage({ params }: { params: Promise<{ tok
   const { test, candidate } = data;
   const duration = Math.floor((test?.totalDurationSeconds || 3600) / 60);
   const proctoring = test?.proctoringConfig || { tabSwitchLimit: 3 };
-  const isDevicesReady = cameraReady && screenReady;
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 py-6 sm:py-12 px-3 sm:px-6">
@@ -157,32 +145,20 @@ export default function TestInstructionsPage({ params }: { params: Promise<{ tok
         <Card className="border-2 border-emerald-400 bg-emerald-50/70 shadow-sm space-y-4 p-4 sm:p-6">
           <div className="flex items-center gap-2">
             <ShieldCheck className="w-5 h-5 text-emerald-600 shrink-0" />
-            <h2 className="text-sm sm:text-base font-bold text-slate-900">Step 1: Pre-Exam Device & Screen Sharing Setup</h2>
+            <h2 className="text-sm sm:text-base font-bold text-slate-900">Step 1: Pre-Exam Camera Verification</h2>
           </div>
           <p className="text-xs text-slate-600 font-medium leading-relaxed">
-            To prevent accidental proctoring violations during the exam, please grant Camera & Screen Sharing permissions now before clicking Start Test.
+            Please grant Camera permission to enable proctoring monitoring during the exam.
           </p>
 
           <div className="space-y-3">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 p-3 sm:p-3.5 bg-white rounded-xl border border-slate-200 shadow-sm">
               <div className="flex items-center gap-2.5 text-xs font-bold text-slate-900">
                 <Camera className="w-4 h-4 text-emerald-600 shrink-0" />
-                <span>Webcam & Microphone Check</span>
+                <span>Webcam Check</span>
               </div>
               {cameraReady ? (
                 <Badge variant="success">✓ Camera Active</Badge>
-              ) : (
-                <Badge variant="neutral">Pending</Badge>
-              )}
-            </div>
-
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 p-3 sm:p-3.5 bg-white rounded-xl border border-slate-200 shadow-sm">
-              <div className="flex items-center gap-2.5 text-xs font-bold text-slate-900">
-                <Monitor className="w-4 h-4 text-sky-600 shrink-0" />
-                <span>Entire Screen Sharing Check</span>
-              </div>
-              {screenReady ? (
-                <Badge variant="success">✓ Screen Sharing Active</Badge>
               ) : (
                 <Badge variant="neutral">Pending</Badge>
               )}
@@ -193,10 +169,10 @@ export default function TestInstructionsPage({ params }: { params: Promise<{ tok
             type="button"
             onClick={handleDeviceSetup}
             loading={permissionsRequesting}
-            variant={isDevicesReady ? "secondary" : "primary"}
+            variant={cameraReady ? "secondary" : "primary"}
             className="w-full font-bold text-xs sm:text-sm py-2.5 shadow-sm"
           >
-            {isDevicesReady ? "✓ Device & Screen Verification Complete" : "🎥 Step 1: Enable Camera & Share Screen"}
+            {cameraReady ? "✓ Camera Verified" : "🎥 Step 1: Enable Camera"}
           </Button>
         </Card>
 
@@ -237,15 +213,15 @@ export default function TestInstructionsPage({ params }: { params: Promise<{ tok
         </Card>
 
         <div className="flex justify-center pt-2">
-          <Button
-            onClick={handleStart}
-            loading={starting}
-            disabled={!agreed || !isDevicesReady}
-            size="lg"
-            className="w-full sm:w-auto px-8 sm:px-12 text-sm sm:text-base font-bold"
-          >
-            Step 2: Start Proctored Exam →
-          </Button>
+         <Button
+  onClick={handleStart}
+  loading={starting}
+  disabled={!agreed || !cameraReady}
+  size="lg"
+  className="w-full sm:w-auto px-8 sm:px-12 text-sm sm:text-base font-bold"
+>
+  Step 2: Start Proctored Exam →
+</Button>
         </div>
       </div>
     </div>
