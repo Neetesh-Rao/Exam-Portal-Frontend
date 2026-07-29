@@ -167,28 +167,24 @@ export default function CategoryQuestionPicker({
 
   return (
     <div className="space-y-4">
-      {/* Live Selection Status Summary Bar */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-3.5 rounded-2xl border bg-slate-900 text-white shadow-md">
-        <div className="flex items-center gap-2.5 flex-wrap">
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 text-xs font-extrabold">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-            <span>✓ Selected for Test: {totalSelectedCount}</span>
-          </div>
-
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-amber-500/20 border border-amber-500/30 text-amber-300 text-xs font-extrabold">
-            <span className="w-2 h-2 rounded-full bg-amber-400"></span>
-            <span>⭕ Unselected: {totalUnselectedCount}</span>
-          </div>
-
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-800 border border-slate-700 text-slate-300 text-xs font-medium">
-            <span>Total Question Bank: {questions.length}</span>
-          </div>
+      {/* Clean Selection Summary Row */}
+      <div className="flex flex-wrap items-center gap-3 px-1 py-2 border-b" style={{ borderColor: "var(--border-color)" }}>
+        <div className="flex items-center gap-1.5 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
+          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+          <span>{totalSelectedCount} Selected</span>
         </div>
-
+        <span className="text-[var(--border-color)]">•</span>
+        <div className="flex items-center gap-1.5 text-xs font-medium text-[var(--text-muted)]">
+          <span>{totalUnselectedCount} Not Selected</span>
+        </div>
+        <span className="text-[var(--border-color)]">•</span>
+        <div className="flex items-center gap-1.5 text-xs font-medium text-[var(--text-muted)]">
+          <span>{questions.length} Total</span>
+        </div>
         {(categoryFilter !== "All" || typeFilter !== "All" || searchQuery) && (
-          <div className="text-xs text-sky-300 font-mono font-semibold">
-            Filtered View: {filteredSelectedCount} selected / {filteredUnselectedCount} unselected
-          </div>
+          <span className="ml-auto text-xs text-sky-600 dark:text-sky-400 font-mono">
+            Filtered: {filteredSelectedCount} selected / {filteredUnselectedCount} not selected
+          </span>
         )}
       </div>
 
